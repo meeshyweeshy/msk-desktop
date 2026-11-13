@@ -452,3 +452,8 @@ kbd { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; b
 .upd-ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: var(--miku); color: #001a18; flex: none; animation: updGlow 2.4s ease-in-out infinite; }
 .upd-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .upd-notes { font-size: 11.5px; margin-top: 4px; }
+
+/* ---------- macOS ---------- */
+.mac .tb-right .wc:not(#theme-btn) { display: none; }
+.mac .titlebar { padding-left: 86px; }
+.mac .brand { width: 168px; }

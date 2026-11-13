@@ -83,7 +83,17 @@ class TVConnector extends EventEmitter {
   // Finds a TradingView that's already hooked (by MSK or another app like ChartSkins) and returns its port.
   findHookedPort() {
     return new Promise((resolve) => {
-      if (process.platform !== "win32") return resolve(null);
+      if (process.platform !== "win32") {
+        return exec("ps -axo command", { timeout: 5000 }, (err, out) => {
+          if (err || !out) return resolve(null);
+          for (const line of out.split(/\n/)) {
+            if (!/tradingview/i.test(line) || /--type=/.test(line) || /MSK/.test(line)) continue;
+            const m = /--remote-debugging-port=(\d+)/.exec(line);
+            if (m && +m[1] > 0) return resolve(+m[1]);
+          }
+          resolve(null);
+        });
+      }
       const ps = "Get-CimInstance Win32_Process -Filter \"Name='TradingView.exe'\" | ForEach-Object { $_.CommandLine }";
       runPS(ps, 8000, (err, out) => {
         if (err || !out) return resolve(null);
@@ -110,6 +120,7 @@ class TVConnector extends EventEmitter {
   isRunning() {
     try {
       if (process.platform === "win32") return /TradingView\.exe/i.test(execSync('tasklist /FI "IMAGENAME eq TradingView.exe" /NH', { timeout: 4000, windowsHide: true }).toString());
+      if (process.platform === "darwin") return execSync("pgrep -x TradingView || true", { timeout: 3000 }).toString().trim().length > 0;
       return execSync("pgrep -i -x tradingview || true", { timeout: 3000 }).toString().trim().length > 0;
     } catch { return false; }
   }
@@ -238,14 +249,20 @@ class TVConnector extends EventEmitter {
     const s = this.getSettings(), env = process.env;
     if (s.tvPath) {
       let p = s.tvPath.replace(/^"|"$/g, "");
-      if (!/\.exe$/i.test(p)) p = path.join(p, "TradingView.exe");
+      if (process.platform === "darwin") { if (/\.app\/?$/i.test(p)) p = macExe(p); }
+      else if (!/\.exe$/i.test(p)) p = path.join(p, "TradingView.exe");
       const msix = /\\WindowsApps\\/i.test(p);
       if (fs.existsSync(p) || msix) return { path: p, kind: msix ? "msix" : "custom", pkg: msix ? path.basename(path.dirname(p)) : undefined };
       log.warn("Custom TradingView path not found", p);
     }
     if (process.platform === "darwin") {
-      const p = "/Applications/TradingView.app/Contents/MacOS/TradingView";
-      return fs.existsSync(p) ? { path: p, kind: "classic" } : null;
+      const hit = (apps) => { for (const a of apps) { const p = macExe(a); if (fs.existsSync(p)) return { path: p, kind: "mac", app: a }; } return null; };
+      const r = hit(["/Applications/TradingView.app", path.join(require("os").homedir(), "Applications", "TradingView.app")]);
+      if (r) return r;
+      if (this._mdfind === undefined) {
+        try { this._mdfind = execSync(`mdfind "kMDItemFSName == 'TradingView.app'" | head -3`, { timeout: 5000 }).toString().trim().split("\n").filter(Boolean); } catch { this._mdfind = []; }
+      }
+      return hit(this._mdfind);
     }
     if (process.platform !== "win32") {
       for (const p of ["/opt/TradingView/tradingview", "/usr/bin/tradingview", "/snap/tradingview/current/tradingview"]) if (fs.existsSync(p)) return { path: p, kind: "classic" };
@@ -277,6 +294,7 @@ class TVConnector extends EventEmitter {
   killTV() {
     try {
       if (process.platform === "win32") execSync("taskkill /F /IM TradingView.exe", { timeout: 6000, windowsHide: true });
+      else if (process.platform === "darwin") execSync("pkill -x TradingView", { timeout: 4000 });
       else execSync("pkill -i -x tradingview", { timeout: 4000 });
     } catch {}
   }
@@ -402,7 +420,13 @@ public static class MskActivate {
         }
       } catch (e) { log.warn("netstat failed", e.message); }
     } else {
-      try { execSync("pkill -9 -i -x tradingview", { timeout: 4000 }); killed.push("tradingview"); } catch {}
+      const darwin = process.platform === "darwin";
+      try { const l = execSync(darwin ? "pgrep -lf 'TradingView.app/Contents/' || true" : "pgrep -l -i tradingview || true", { timeout: 4000 }).toString().trim(); if (l) l.split("\n").forEach((x) => killed.push(x.slice(0, 80))); } catch {}
+      try { execSync(darwin ? "pkill -9 -f 'TradingView.app/Contents/'" : "pkill -9 -i -x tradingview", { timeout: 4000 }); } catch {}
+      try {
+        const pids = execSync(`lsof -nP -iTCP:${this.port} -sTCP:LISTEN -t || true`, { timeout: 5000 }).toString().trim().split("\n").filter(Boolean);
+        for (const pid of pids) { if (+pid === process.pid) continue; try { process.kill(+pid, "SIGKILL"); killed.push(`pid ${pid} on port ${this.port}`); } catch {} }
+      } catch {}
     }
     log.info(killed.length ? `Killed: ${killed.join(", ")}` : "Nothing to kill");
     this.runningNoPort = false; this.lastRunCheck = 0;
@@ -420,7 +444,7 @@ public static class MskActivate {
       log.info("Package exe readable", fs.existsSync(d.path));
       log.info("MSK copy", this.copyInfo(dataDir) || "none yet");
     }
-    log.info("TradingView.exe running", this.isRunning());
+    log.info("TradingView running", this.isRunning());
     log.info("Ports", { configured: this.port, attachedTo: this.cdpPort, hookedProcessPort: await this.findHookedPort() });
     const ver = await getJSON(`http://127.0.0.1:${this.cdpPort}/json/version`);
     log.info("Hook port", ver ? { open: true, browser: ver.Browser, ua: (ver["User-Agent"] || "").slice(0, 90) } : { open: false });
@@ -522,9 +546,16 @@ public static class MskActivate {
       log.info("Starting", { exe: file, args });
       const outFile = path.join(path.dirname(LOG.file() || dataDir), "tradingview.log");
       let fd = "ignore"; try { fd = ofs.openSync(outFile, "w"); } catch {}
-      let c; try { c = spawn(file, args, { detached: true, stdio: ["ignore", fd, fd], cwd: path.dirname(file) }); } catch (e) { log.error("Spawn threw", e.message); return resolve(e.code || "spawn failed"); }
+      const darwin = process.platform === "darwin";
+      const bundle = darwin ? file.replace(/\/Contents\/MacOS\/[^/]+$/, "") : null;
+      let c; try {
+        c = darwin
+          ? spawn("open", ["-n", "-a", bundle, ...(fd !== "ignore" ? ["--stdout", outFile, "--stderr", outFile] : []), "--args", ...args], { detached: true, stdio: "ignore" })
+          : spawn(file, args, { detached: true, stdio: ["ignore", fd, fd], cwd: path.dirname(file) });
+      } catch (e) { log.error("Spawn threw", e.message); return resolve(e.code || "spawn failed"); }
       c.once("error", (e) => { log.error("Spawn error", e.message); resolve(e.code || "spawn failed"); });
       c.once("exit", (code) => {
+        if (darwin && code === 0) return; // `open` hands off to macOS and exits right away
         let tail = ""; try { tail = ofs.readFileSync(outFile, "utf8").trim().slice(-1500); } catch {}
         log.warn(`TradingView process exited (code ${code})`, tail || "(no output)");
       });
@@ -564,6 +595,13 @@ public static class MskActivate {
     this.poll();
     return ok ? { ok: true, message: "TradingView hooked" } : { ok: false, message: `TradingView not hooked: ${why}.` };
   }
+}
+
+// The executable inside a macOS .app bundle (CFBundleExecutable, usually "TradingView").
+function macExe(app) {
+  let name = "TradingView";
+  try { const m = fs.readFileSync(path.join(app, "Contents", "Info.plist"), "utf8").match(/<key>CFBundleExecutable<\/key>\s*<string>([^<]+)<\/string>/); if (m) name = m[1]; } catch {}
+  return path.join(app, "Contents", "MacOS", name);
 }
 
 // Run a PowerShell script safely (no quoting issues) via -EncodedCommand.

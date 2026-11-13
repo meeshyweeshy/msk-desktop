@@ -1,8 +1,8 @@
 {
   "name": "msk",
   "productName": "MSK",
-  "version": "1.2.0",
-  "description": "MSK - custom backgrounds and chart skins for TradingView Desktop",
+  "version": "1.3.0",
+  "description": "MSK - custom backgrounds and chart skins for TradingView Desktop (Windows & macOS)",
   "author": "meeshy",
   "main": "src/main/main.js",
   "scripts": {
@@ -10,7 +10,8 @@
     "icons": "node scripts/make-icons.mjs",
     "dist": "electron-builder --win nsis zip --x64",
     "ext": "node scripts/build-extension.mjs",
-    "banner": "node scripts/make-banner.mjs"
+    "banner": "node scripts/make-banner.mjs",
+    "dist-mac": "electron-builder --mac dmg zip --arm64 --x64"
   },
   "dependencies": {
     "ws": "^8.18.0"
@@ -44,7 +45,13 @@
         "zip"
       ],
       "icon": "build/icon.ico",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "extraFiles": [
+        {
+          "from": "build/MSK Debug.cmd",
+          "to": "MSK Debug.cmd"
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -55,13 +62,55 @@
       "uninstallerIcon": "build/icon.ico",
       "artifactName": "MSK-Setup-${version}.${ext}"
     },
-    "afterPack": "scripts/after-pack.js",
-    "extraFiles": [
-      {
-        "from": "build/MSK Debug.cmd",
-        "to": "MSK Debug.cmd"
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.finance",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true,
+      "extendInfo": {
+        "LSUIElement": false,
+        "NSHighResolutionCapable": true
       }
-    ],
+    },
+    "dmg": {
+      "artifactName": "MSK-${version}-mac-${arch}.${ext}",
+      "title": "MSK ${version}",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 140,
+          "y": 190
+        },
+        {
+          "x": 400,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "afterPack": "scripts/after-pack.js",
     "artifactName": "MSK-${version}-${os}-${arch}.${ext}"
   },
   "repository": {

@@ -1,13 +1,16 @@
 import { Resvg } from "@resvg/resvg-js";
 import pngToIco from "png-to-ico";
 import fs from "fs";
-import { logoSVG, smallIconSVG, wordmarkSVG } from "./logo.mjs";
+import { logoSVG, smallIconSVG, wordmarkSVG, templateIconSVG, macIconSVG } from "./logo.mjs";
 const big = logoSVG(), small = smallIconSVG();
 const render = (svg, w) => new Resvg(svg, { fitTo: { mode: "width", value: w } }).render().asPng();
 fs.writeFileSync("build/icon.png", render(big, 512));
 fs.writeFileSync("build/icon.svg", big);
 fs.writeFileSync("src/main/tray.png", render(small, 32));
 fs.writeFileSync("src/main/tray@2x.png", render(small, 64));
+fs.writeFileSync("src/main/trayTemplate.png", render(templateIconSVG(), 21));
+fs.writeFileSync("src/main/trayTemplate@2x.png", render(templateIconSVG(), 42));
+fs.writeFileSync("build/icon-mac.png", render(macIconSVG(), 1024));
 const ico = [16, 24, 32, 48].map((s) => render(small, s)).concat([64, 128, 256].map((s) => render(big, s)));
 fs.writeFileSync("build/icon.ico", await pngToIco(ico));
 fs.writeFileSync("src/renderer/logo.js", `window.MSK_WORDMARK = ${JSON.stringify(wordmarkSVG())};\nwindow.MSK_ICON = ${JSON.stringify(big)};\n`);

@@ -2,6 +2,14 @@
 const path = require("path");
 const fs = require("fs");
 exports.default = async function afterPack(ctx) {
+  if (ctx.electronPlatformName === "darwin") {
+    // No Apple developer cert: ad-hoc sign so Apple Silicon will run it at all.
+    const app = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + ".app");
+    if (process.platform !== "darwin") { console.log("  • skipping ad-hoc signing (not on a Mac)"); return; }
+    require("child_process").execFileSync("codesign", ["--force", "--deep", "--sign", "-", app], { stdio: "inherit" });
+    console.log("  • ad-hoc signed", path.basename(app));
+    return;
+  }
   if (ctx.electronPlatformName !== "win32") return;
   const exe = path.join(ctx.appOutDir, ctx.packager.appInfo.productFilename + ".exe");
   const ResEdit = await import("resedit");

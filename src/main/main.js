@@ -22,7 +22,8 @@ let win, tray, tv, data, preview = null, quitting = false, lastRotate = Date.now
 const UPDATE_REPO = "meeshyweeshy/msk-desktop";
 const ROOT = path.join(__dirname, "..", "..");
 const ICON = path.join(ROOT, "build", "icon.png");
-const startHidden = process.argv.includes("--hidden") || process.argv.includes("--launch-tv");
+const IS_MAC = process.platform === "darwin";
+const startHidden = process.argv.includes("--hidden") || process.argv.includes("--launch-tv") || (IS_MAC && (() => { try { return app.getLoginItemSettings().wasOpenedAtLogin; } catch { return false; } })());
 
 // ---------- state ----------
 const findMedia = (id) => data.media.find((m) => m.id === id);
@@ -35,7 +36,7 @@ function payload() {
 }
 function fullState() {
   return { settings: data.settings, media: data.media, configs: data.configs, activeConfigId: data.activeConfigId,
-    enabled: data.enabled, fxPaused: !!data.fxPaused, update: updateInfo, dismissedUpdate: data.dismissedUpdate || null, tv: tv ? tv.state : { status: "offline" }, version: app.getVersion(), dataDir: store.dir };
+    os: (process.env.MSK_SHOT && process.env.MSK_FAKE_OS) || process.platform, enabled: data.enabled, fxPaused: !!data.fxPaused, update: updateInfo, dismissedUpdate: data.dismissedUpdate || null, tv: tv ? tv.state : { status: "offline" }, version: app.getVersion(), dataDir: store.dir };
 }
 let bt;
 function changed({ push = true } = {}) {
@@ -49,7 +50,8 @@ function changed({ push = true } = {}) {
 function createWindow() {
   const wa = screen.getPrimaryDisplay().workAreaSize;
   win = new BrowserWindow({
-    width: Math.max(1100, Math.min(1480, Math.round(wa.width * 0.86))), height: Math.max(720, Math.min(960, Math.round(wa.height * 0.88))), minWidth: 1040, minHeight: 700, show: false, frame: false,
+    width: Math.max(1100, Math.min(1480, Math.round(wa.width * 0.86))), height: Math.max(720, Math.min(960, Math.round(wa.height * 0.88))),
+    ...(IS_MAC ? { titleBarStyle: "hiddenInset", trafficLightPosition: { x: 16, y: 15 } } : {}), minWidth: 1040, minHeight: 700, show: false, frame: IS_MAC,
     backgroundColor: data.settings.theme === "light" ? "#f4f5f6" : "#000000",
     icon: ICON, title: "MSK",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: true },
@@ -74,7 +76,8 @@ function showWindow(page) {
 // ---------- tray ----------
 function buildTray() {
   if (!tray) {
-    const img = nativeImage.createFromPath(path.join(__dirname, "tray.png"));
+    const img = nativeImage.createFromPath(path.join(__dirname, IS_MAC ? "trayTemplate.png" : "tray.png"));
+    if (IS_MAC) img.setTemplateImage(true);
     tray = new Tray(img);
     tray.setToolTip("MSK");
     tray.on("click", () => showWindow());
@@ -111,8 +114,9 @@ async function checkUpdates(manual) {
     if (!r.ok) { log.info(`Update check: no release found (${r.status})`); return { status: r.status === 404 ? "none" : "error" }; }
     const j = await r.json();
     const latest = String(j.tag_name || j.name || "").replace(/^v/i, "");
-    const exe = (j.assets || []).find((a) => /\.exe$/i.test(a.name));
-    const zip = (j.assets || []).find((a) => /win.*\.zip$/i.test(a.name));
+    const arch = process.arch === "arm64" ? "arm64" : "x64";
+    const exe = IS_MAC ? (j.assets || []).find((a) => /\.dmg$/i.test(a.name) && a.name.includes(arch)) : (j.assets || []).find((a) => /\.exe$/i.test(a.name));
+    const zip = (j.assets || []).find((a) => (IS_MAC ? new RegExp(`mac-${arch}\\.zip$`, "i") : /win.*\.zip$/i).test(a.name));
     data.lastUpdateCheck = Date.now();
     if (latest && newer(latest, app.getVersion())) {
       const fresh = !updateInfo || updateInfo.version !== latest;
@@ -150,7 +154,10 @@ async function launchTV(restart) {
   return r;
 }
 function applyLoginItem() {
-  try { app.setLoginItemSettings({ openAtLogin: !!data.settings.startup, path: process.execPath, args: ["--hidden"] }); } catch {}
+  try {
+    if (IS_MAC) app.setLoginItemSettings({ openAtLogin: !!data.settings.startup, openAsHidden: true });
+    else app.setLoginItemSettings({ openAtLogin: !!data.settings.startup, path: process.execPath, args: ["--hidden"] });
+  } catch {}
 }
 function registerHotkeys() {
   globalShortcut.unregisterAll();
@@ -305,7 +312,9 @@ function registerIPC() {
     return { ok, message: ok ? "Shortcut added to your desktop" : "Couldn't make the shortcut" };
   });
   h("tv:browse", async () => {
-    const r = await dialog.showOpenDialog(win, { title: "Find TradingView.exe", properties: ["openFile"], filters: [{ name: "TradingView", extensions: process.platform === "win32" ? ["exe"] : ["*"] }] });
+    const r = await dialog.showOpenDialog(win, IS_MAC
+      ? { title: "Find TradingView", defaultPath: "/Applications", properties: ["openFile"], filters: [{ name: "Apps", extensions: ["app"] }] }
+      : { title: "Find TradingView.exe", properties: ["openFile"], filters: [{ name: "TradingView", extensions: process.platform === "win32" ? ["exe"] : ["*"] }] });
     if (r.canceled) return null;
     data.settings.tvPath = r.filePaths[0]; changed({ push: false }); return r.filePaths[0];
   });
@@ -345,10 +354,29 @@ app.on("second-instance", (_e, argv) => {
   if (argv.includes("--launch-tv")) launchTV(true); else showWindow();
 });
 app.on("before-quit", () => { quitting = true; });
+let booted = false;
+app.on("activate", (_e, hasVisible) => { if (booted && !hasVisible) showWindow(); });
 app.on("will-quit", () => { globalShortcut.unregisterAll(); watcher.stop(); });
 app.on("window-all-closed", (e) => { if (!data.settings.closeToTray) app.quit(); });
 
+function macMenu() {
+  if (!IS_MAC) return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    { label: "MSK", submenu: [
+      { role: "about" }, { type: "separator" },
+      { label: "Settings…", accelerator: "Cmd+,", click: () => showWindow("settings") },
+      { label: "Check for updates…", click: () => checkUpdates(true) },
+      { type: "separator" }, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" },
+      { type: "separator" }, { label: "Quit MSK", accelerator: "Cmd+Q", click: () => { quitting = true; app.quit(); } },
+    ] },
+    { role: "editMenu" },
+    { label: "View", submenu: [{ role: "reload" }, { role: "toggleDevTools" }, { type: "separator" }, { role: "togglefullscreen" }] },
+    { role: "windowMenu" },
+  ]));
+}
+
 app.whenReady().then(async () => {
+  macMenu();
   data = store.load();
   protocol.handle("msk", (req) => {
     try {
@@ -369,6 +397,7 @@ app.whenReady().then(async () => {
   buildTray();
   applyLoginItem();
   registerHotkeys();
+  setTimeout(() => { booted = true; }, 1500);
   if (data.settings.autoUpdate !== false) setTimeout(() => checkUpdates(false), process.env.MSK_UPDATE_URL ? 500 : 8000);
   if (process.argv.includes("--launch-tv")) setTimeout(() => launchTV(true), 800);
   else if (data.settings.autoLaunchTV) {

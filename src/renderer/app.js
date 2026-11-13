@@ -32,6 +32,7 @@
   const mediaURL = (m) => (window.MSK_URLS ? window.MSK_URLS.media(m) : `msk://media/${m.id}?r=${m.rev || 0}`);
   const thumbURL = (m) => (window.MSK_URLS ? window.MSK_URLS.thumb(m) : `msk://thumb/${m.id}?r=${m.thumbRev || 0}`);
   const isExt = () => S && S.platform === "extension";
+  const isMac = () => S && S.os === "darwin";
   const findMedia = (id) => S.media.find((m) => m.id === id);
   const findCfg = (id) => S.configs.find((c) => c.id === id);
   const activeCfg = () => findCfg(S.activeConfigId) || S.configs[0];
@@ -681,9 +682,9 @@
         <div class="set-tabs glass" id="set-tabs"><span class="thumb"></span>${SECTIONS.map(([k, l, ic]) => `<button data-sec="${k}">${ic}<span>${l}</span></button>`).join("")}</div>
         <div class="set-body stagger">
           <section class="set-sec glass" id="sec-general" style="--i:0"><h3>${I.home}General</h3>
-            ${D(R(I.power, "Launch MSK when Windows starts", "Starts quietly in the tray when you log in", "startup"))}
-            ${D(R(I.eye, "Start hidden", "Only the tray icon shows on startup", "startHidden"))}
-            ${D(R(I.layers, "Close to tray", "The X button keeps MSK running in the background", "closeToTray"))}
+            ${D(R(I.power, isMac() ? "Open MSK when you log in" : "Launch MSK when Windows starts", isMac() ? "Starts quietly in the menu bar" : "Starts quietly in the tray when you log in", "startup"))}
+            ${D(R(I.eye, "Start hidden", isMac() ? "Only the menu bar icon shows on login" : "Only the tray icon shows on startup", "startHidden"))}
+            ${D(R(I.layers, isMac() ? "Keep running when closed" : "Close to tray", isMac() ? "Closing the window keeps MSK in the menu bar" : "The X button keeps MSK running in the background", "closeToTray"))}
             ${R(I.moon, "Theme", "Black or white app look", "theme")}
             ${R(I.out, "Check for updates automatically", "Looks for a new version on GitHub every few hours", "autoUpdate")}
             ${R(I.refresh, "Check for updates", `You're on v${esc(S.version)}`, "checkUpd")}
@@ -694,21 +695,21 @@
             <div class="tv-hero" id="tv-hero"></div>
             ${EXT ? `<div class="faint" style="font-size:12.5px;padding:6px 0 14px">MSK runs on every tradingview.com chart tab in this browser. Changes show up instantly, no restart needed.</div>` : ""}
             ${EXT ? "" : `${R(I.play, "Open TradingView with MSK", "Starts it hooked whenever MSK starts", "autoLaunchTV")}
-            ${R(I.bolt, "Launch method", "Auto tries the package way first, then a private copy", "method")}
+            ${isMac() ? "" : R(I.bolt, "Launch method", "Auto tries the package way first, then a private copy", "method")}
             ${R(I.plug, "Hook port", "Change only if another app already uses it", "port")}
             <div class="set-row col" data-q="app location path tradingview exe detect browse"><span class="row-ico">${I.folder}</span>
               <div class="t"><b>App location</b><small>Leave on auto unless MSK can't find TradingView</small></div>
               <div class="path" id="s-path">${esc(s.tvPath || "Auto-detect")}</div>
               <div class="row wrap"><button class="btn glass bubble sm" data-act="detect">${I.search}Detect</button><button class="btn glass bubble sm" data-act="browse">${I.folder}Browse</button><button class="btn ghost sm" data-act="clearPath">Use auto</button></div></div>
-            ${R(I.plus, "Desktop shortcut", '"TradingView (MSK)" opens it already hooked', "shortcut")}
-            ${R(I.refresh, "Refresh MSK's TradingView copy", "Only matters if the copy method is used", "resetCopy")}`}
+            ${isMac() ? "" : R(I.plus, "Desktop shortcut", '"TradingView (MSK)" opens it already hooked', "shortcut")}
+            ${isMac() ? "" : R(I.refresh, "Refresh MSK's TradingView copy", "Only matters if the copy method is used", "resetCopy")}`}
           </section>
           <section class="set-sec glass" id="sec-fx" style="--i:2"><h3>${I.wand}Animations</h3>
             ${R(I.wand, "Animations on", "Master switch for every config's FX", "fxOn")}
-            ${R(I.bolt, "Chart color speed", "How often animated candle colors update on TradingView. Lower is lighter on your PC.", "fxFps")}
+            ${R(I.bolt, "Chart color speed", "How often animated candle colors update on TradingView. Lower is lighter on your computer.", "fxFps")}
           </section>
           <section class="set-sec glass" id="sec-keys" style="--i:3"><h3>${I.keyboard}Hotkeys</h3>
-            <div class="faint" style="font-size:12px;margin:-4px 0 6px">${EXT ? "Chrome shortcuts. Change them on Chrome's shortcuts page." : "Work anywhere in Windows. Click a shortcut, press the new keys. Backspace clears it."}</div>
+            <div class="faint" style="font-size:12px;margin:-4px 0 6px">${EXT ? "Chrome shortcuts. Change them on Chrome's shortcuts page." : `Work anywhere ${isMac() ? "on your Mac" : "in Windows"}. Click a shortcut, press the new keys. Backspace clears it.`}</div>
             ${R(I.power, "Toggle background", "Turns your background on or off", "hk-toggle")}
             ${R(I.next, "Next config", "Jumps to the next config", "hk-next")}
             ${R(I.wand, "Pause animations", "Freezes all FX instantly", "hk-fx")}
@@ -718,12 +719,12 @@
           ${EXT ? "" : `<section class="set-sec glass" id="sec-debug" style="--i:4"><h3>${I.bug}Debug</h3>
             ${R(I.eye, "Show logs", "Shows the Logs page in the sidebar", "showLogs")}
             ${R(I.list, "Verbose logging", "Logs every detail. Turn on when something's off.", "verbose")}
-            ${R(I.search, "Watch processes", "Logs TradingView and ChartSkins processes, ports and connections", "watch")}
+            ${isMac() ? "" : R(I.search, "Watch processes", "Logs TradingView and ChartSkins processes, ports and connections", "watch")}
             ${R(I.list, "Open logs", "Live log viewer with filters", "openLogs")}
             ${R(I.folder, "Log file", "msk.log in your MSK data folder", "logFile")}
             ${R(I.search, "Run diagnostics", "Checks the whole hook chain and writes it to the log", "diag")}
             ${R(I.play, "Launch test", "Starts TradingView 3 ways to see what makes it quit (about 50s)", "test")}
-            ${R(I.trash, "Kill all related processes", "Every TradingView.exe plus anything holding the hook port", "kill")}
+            ${R(I.trash, "Kill all related processes", isMac() ? "Every TradingView process plus anything holding the hook port" : "Every TradingView.exe plus anything holding the hook port", "kill")}
           </section>`}
           <section class="set-sec glass" id="sec-data" style="--i:5"><h3>${I.folder}Data</h3>
             ${EXT ? R(I.folder, "Storage", "Media and configs are stored inside this browser profile. Export configs to move them to the desktop app.", "data") : R(I.folder, "Data folder", esc(S.dataDir || ""), "data")}
@@ -761,7 +762,7 @@
       put("fxFps", seg([["6", "Light"], ["11", "Normal"], ["20", "Smooth"]], String(s.fxFps || 11), (f) => api.settings({ fxFps: +f })));
       for (const k of ["toggle", "next", "fx"]) put("hk-" + k, EXT ? el(`<span class="keys">${keycaps(S.settings.hotkeys[k])}</span>`) : hotkeyBox(k));
       if (EXT) put("hk-edit", btn("Open", "glass bubble", () => api.tv.shortcuts()));
-      put("hk-pal", el(`<span class="keys">${keycaps("Ctrl+K")}</span>`));
+      put("hk-pal", el(`<span class="keys">${keycaps(isMac() ? "CommandOrControl+K" : "Ctrl+K")}</span>`));
       put("showLogs", sw(s.showLogs !== false, (on) => api.settings({ showLogs: on })));
       put("verbose", sw(info.verbose, (on) => api.logs.verbose(on)));
       put("watch", sw(info.watching, async (on) => { const r = await api.watch(on); if (on && !r) toast("Watcher only works on Windows", "warn"); }));
@@ -848,7 +849,10 @@
         if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return;
         if (e.key === "Escape") return done();
         if (e.key === "Backspace") { api.settings({ hotkeys: { [key]: "" } }); S.settings.hotkeys[key] = ""; return done(); }
-        const parts = []; if (e.ctrlKey) parts.push("CommandOrControl"); if (e.altKey) parts.push("Alt"); if (e.shiftKey) parts.push("Shift");
+        const parts = [];
+        if (isMac() ? e.metaKey : e.ctrlKey) parts.push("CommandOrControl");
+        if (isMac() && e.ctrlKey) parts.push("Control");
+        if (e.altKey) parts.push("Alt"); if (e.shiftKey) parts.push("Shift");
         const k = e.code.startsWith("Key") ? e.code.slice(3) : e.code.startsWith("Digit") ? e.code.slice(5) : /^F\d+$/.test(e.key) ? e.key : null;
         if (!k || !parts.length) return;
         const acc = [...parts, k].join("+");
@@ -976,7 +980,10 @@
   }
 
   const TV_KIND = { custom: "Custom path", classic: "Classic installer", msixcore: "MSIX Core install", msix: "tradingview.com / Microsoft package" };
-  function hkShow(a) { return (a || "").replace("CommandOrControl", "Ctrl") || "None"; }
+  function hkShow(a) {
+    if (!a) return "None";
+    return isMac() ? a.replace("CommandOrControl", "⌘").replace("Control", "⌃").replace("Alt", "⌥").replace("Shift", "⇧") : a.replace("CommandOrControl", "Ctrl");
+  }
 
   // ---------- router ----------
   function placeBlob() {
@@ -1020,6 +1027,7 @@
   async function boot() {
     S = await api.state();
     if (isExt()) { document.body.classList.add("ext"); document.title = "MSK Studio"; }
+    if (isMac()) { document.body.classList.add("mac"); const k = $("#pal-btn kbd"); if (k) k.textContent = "⌘K"; }
     $("#wm-small").innerHTML = WORDMARK;
     renderChrome();
     $$("#nav button").forEach((b) => (b.onclick = () => go(b.dataset.page)));

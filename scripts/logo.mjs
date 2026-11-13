@@ -60,3 +60,20 @@ export function smallIconSVG() {
   <rect x="8" y="8" width="496" height="496" rx="104" fill="#0b0d0e" shape-rendering="geometricPrecision"/>
   <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#39C5BB" stroke-opacity=".6" stroke-width="14" shape-rendering="geometricPrecision"/>${r}</svg>`;
 }
+
+// macOS menu bar: pixel "m" in solid black on transparent (template image, macOS tints it).
+export function templateIconSVG() {
+  const g = GLYPHS.m.slice(2, 7);
+  let r = "";
+  g.forEach((row, y) => [...row].forEach((c, x) => { if (c === "X") r += `<rect x="${x + 1}" y="${y + 1}" width="1" height="1" fill="#000"/>`; }));
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7 7" width="7" height="7" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+// macOS app icon: same tile, inset to Apple's icon grid (824 of 1024) with a soft shadow.
+export function macIconSVG() {
+  const inner = logoSVG().replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" shape-rendering="crispEdges">
+  <defs><filter id="ds" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".35"/></filter></defs>
+  <g filter="url(#ds)" transform="translate(100 92) scale(${824 / 496}) translate(-8 -8)">${inner}</g>
+</svg>`;
+}
