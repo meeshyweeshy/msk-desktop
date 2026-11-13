@@ -80,7 +80,7 @@ class TVConnector extends EventEmitter {
   get port() { return Number(this.getSettings().port) || 9222; }
   get cdpPort() { return this.livePort || this.port; }
 
-  // Finds a TradingView that's already hooked (by MSK or another app like ChartSkins) and returns its port.
+  // Finds a TradingView that's already running with the debug switch and returns its port.
   findHookedPort() {
     return new Promise((resolve) => {
       if (process.platform !== "win32") {
@@ -565,7 +565,7 @@ public static class MskActivate {
     const method = this.getSettings().launchMethod || "auto";
     try {
       if (tv.kind === "msix" && (method === "auto" || method === "package")) {
-        // Same way ChartSkins does it: activate the Store/MSIX app by its package ID and pass the hook switch.
+        // Standard Windows package activation (IApplicationActivationManager) with the debug switch as an argument.
         const aumid = await this.getAumid(tv);
         log.info("Launch method: package activation", { aumid });
         this.setState({ status: "launching", message: "Starting TradingView..." });

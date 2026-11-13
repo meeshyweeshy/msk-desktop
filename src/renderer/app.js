@@ -719,7 +719,7 @@
           ${EXT ? "" : `<section class="set-sec glass" id="sec-debug" style="--i:4"><h3>${I.bug}Debug</h3>
             ${R(I.eye, "Show logs", "Shows the Logs page in the sidebar", "showLogs")}
             ${R(I.list, "Verbose logging", "Logs every detail. Turn on when something's off.", "verbose")}
-            ${isMac() ? "" : R(I.search, "Watch processes", "Logs TradingView and ChartSkins processes, ports and connections", "watch")}
+            ${isMac() ? "" : R(I.search, "Watch processes", "Logs TradingView processes, ports and connections", "watch")}
             ${R(I.list, "Open logs", "Live log viewer with filters", "openLogs")}
             ${R(I.folder, "Log file", "msk.log in your MSK data folder", "logFile")}
             ${R(I.search, "Run diagnostics", "Checks the whole hook chain and writes it to the log", "diag")}
@@ -731,7 +731,8 @@
             ${R(I.image, "Library", `${S.media.length} item${S.media.length === 1 ? "" : "s"} · ${S.configs.length} config${S.configs.length === 1 ? "" : "s"}`, "libStat")}
             ${R(I.refresh, "Restart MSK", "Reloads the app, e.g. after an update", "restart")}
             ${R(I.trash, "Reset MSK", "Deletes all media and configs. Can't be undone.", "reset")}
-            <div class="about"><div class="about-wm">${WORDMARK}</div><div><b>MSK ${esc(S.version)}${isExt() ? " · Chrome extension" : ""}</b><div class="faint" style="font-size:12px">Private build · no account · everything stays on this ${isExt() ? "browser" : "PC"}</div></div></div>
+            ${R(I.list, "Terms of service", "Free, as-is, not financial advice. Read before using.", "terms")}
+            <div class="about"><div class="about-wm">${WORDMARK}</div><div><b>MSK ${esc(S.version)}${isExt() ? " · Chrome extension" : ""}</b><div class="faint" style="font-size:12px">Private build · no account · everything stays on this ${isExt() ? "browser" : isMac() ? "Mac" : "PC"}</div></div></div>
           </section>
           <div class="faint none-found" style="display:none;padding:30px;text-align:center">No settings match that.</div>
         </div></div>`;
@@ -774,6 +775,7 @@
       if (!EXT) put("data", btn(`${I.folder}Open`, "glass bubble", () => api.app.openData()));
       put("libStat", btn("Library", "ghost", () => go("library")));
       put("restart", btn(`${I.refresh}Restart`, "glass bubble", () => api.app.restart()));
+      put("terms", btn("Read", "glass bubble", () => api.openUrl(`https://github.com/meeshyweeshy/${EXT ? "msk-extension" : "msk-desktop"}/blob/main/TERMS.md`)));
       put("reset", btn(`${I.trash}Reset`, "ghost danger", async () => { if (await api.app.reset()) { W.draft = null; toast("MSK reset"); } }));
 
       v.addEventListener("click", async (e) => {

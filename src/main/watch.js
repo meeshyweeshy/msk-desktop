@@ -1,4 +1,4 @@
-// Process watcher (Windows): logs TradingView / ChartSkins processes, their launch commands,
+// Process watcher (Windows): logs TradingView processes, their launch commands,
 // listening ports and local connections between them. Only logs changes.
 const { spawn } = require("child_process");
 const LOG = require("./log");
@@ -8,13 +8,13 @@ const PS = `
 $ErrorActionPreference = 'SilentlyContinue'
 while ($true) {
   $all = Get-CimInstance Win32_Process
-  $hit = $all | Where-Object { $_.Name -match 'tradingview|chartskin' -or $_.CommandLine -match 'tradingview|chartskin' -or $_.ExecutablePath -match 'tradingview|chartskin' }
+  $hit = $all | Where-Object { $_.Name -match 'tradingview' -or $_.ExecutablePath -match 'tradingview' }
   $ids = @($hit | ForEach-Object { $_.ProcessId })
   $names = @{}; foreach ($x in $all) { $names[[string]$x.ProcessId] = $x.Name }
   $procs = @($hit | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; ppid = $_.ParentProcessId; parent = $names[[string]$_.ParentProcessId]; name = $_.Name; exe = $_.ExecutablePath; cmd = $_.CommandLine } })
   $listen = @(Get-NetTCPConnection -State Listen | Where-Object { $ids -contains $_.OwningProcess } | ForEach-Object { [pscustomobject]@{ pid = $_.OwningProcess; addr = $_.LocalAddress; port = $_.LocalPort } })
   $conns = @(Get-NetTCPConnection -State Established | Where-Object { ($ids -contains $_.OwningProcess) -and ($_.RemoteAddress -eq '127.0.0.1' -or $_.RemoteAddress -eq '::1') } | ForEach-Object { [pscustomobject]@{ pid = $_.OwningProcess; lport = $_.LocalPort; rport = $_.RemotePort } })
-  $pipes = @(Get-ChildItem -Path '\\\\.\\pipe\\' | Where-Object { $_.Name -match 'tradingview|chartskin|electron|mojo' } | Select-Object -First 40 | ForEach-Object { $_.Name })
+  $pipes = @(Get-ChildItem -Path '\\\\.\\pipe\\' | Where-Object { $_.Name -match 'tradingview' } | Select-Object -First 40 | ForEach-Object { $_.Name })
   [pscustomobject]@{ procs = $procs; listen = $listen; conns = $conns; pipes = $pipes } | ConvertTo-Json -Depth 4 -Compress
   Start-Sleep -Milliseconds 1500
 }`;
@@ -43,7 +43,7 @@ function start() {
   if (process.platform !== "win32") { log.warn("Process watcher only works on Windows"); return false; }
   prev = { procs: new Map(), listen: new Set(), conns: new Set(), pipes: new Set() };
   child = spawn("powershell", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", PS], { windowsHide: true });
-  log.info("Process watcher ON (TradingView + ChartSkins)");
+  log.info("Process watcher ON (TradingView)");
   child.stdout.on("data", (d) => {
     buf += d.toString();
     let i;

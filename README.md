@@ -126,10 +126,14 @@ npm run ext        # build the browser extension into dist/extension
 - **Mac says MSK "is damaged" or "can't be opened"**: that's the missing Apple notarization, not actual damage. See step 3 of the macOS install.
 - **Candle colors didn't change**: make sure **Recolor the chart** is on in the Workshop. TradingView's internals aren't public, so colors are best-effort. Backgrounds always work.
 
+## ✦ Terms & disclaimer
+
+MSK is free and provided **as-is, with no warranty**. It only changes how your chart looks and **isn't financial advice**. I'm not liable for trading losses, account problems, data loss or anything else that comes from using it. By downloading or using MSK you agree to the **[Terms of Service](TERMS.md)**.
+
 ## ✦ About
 
 MSK started as a "can I put my own wallpaper behind TradingView?" idea and turned into a full chart-skins studio: this desktop app plus a [browser extension](https://github.com/meeshyweeshy/msk-extension). Built by **meeshy** for traders who stare at charts all day and want them to actually look good.
 
-Not affiliated with TradingView.
+Not affiliated with or endorsed by TradingView, Inc. See the [Terms of Service](TERMS.md).
 
 <p align="center"><img src="docs/banner-desktop.svg" alt="" width="40%" /></p>
