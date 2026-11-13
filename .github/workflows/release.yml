@@ -1,0 +1,42 @@
+name: Build Windows release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder --win nsis zip --x64 --publish never
+      - name: Extension zip
+        shell: bash
+        run: |
+          node scripts/build-extension.mjs
+          cp dist/MSK-extension.zip "dist/MSK-extension-${GITHUB_REF_NAME}.zip" || true
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          name: MSK ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/MSK-Setup-*.exe
+            dist/MSK-*-win-x64.zip
+            dist/MSK-extension-*.zip
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: MSK-windows
+          path: |
+            dist/MSK-Setup-*.exe
+            dist/MSK-*-win-x64.zip

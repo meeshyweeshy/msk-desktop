@@ -1,0 +1,72 @@
+{
+  "name": "msk",
+  "productName": "MSK",
+  "version": "1.2.0",
+  "description": "MSK - custom backgrounds and chart skins for TradingView Desktop",
+  "author": "meeshy",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/make-icons.mjs",
+    "dist": "electron-builder --win nsis zip --x64",
+    "ext": "node scripts/build-extension.mjs",
+    "banner": "node scripts/make-banner.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/unbounded": "^5.3.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0",
+    "png-to-ico": "^3.0.2",
+    "resedit": "^3.1.0"
+  },
+  "build": {
+    "appId": "com.meeshy.msk",
+    "productName": "MSK",
+    "copyright": "meeshy",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "build/tray.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "MSK",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "MSK-Setup-${version}.${ext}"
+    },
+    "afterPack": "scripts/after-pack.js",
+    "extraFiles": [
+      {
+        "from": "build/MSK Debug.cmd",
+        "to": "MSK Debug.cmd"
+      }
+    ],
+    "artifactName": "MSK-${version}-${os}-${arch}.${ext}"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meeshyweeshy/msk-desktop.git"
+  },
+  "homepage": "https://github.com/meeshyweeshy/msk-desktop"
+}

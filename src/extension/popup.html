@@ -1,0 +1,26 @@
+<!doctype html>
+<html data-theme="dark">
+<head><meta charset="utf-8" /><link rel="stylesheet" href="popup.css" /></head>
+<body>
+  <header>
+    <div class="brand"><span id="wm"></span><span class="tag">MSK</span></div>
+    <label class="switch big" title="Background on/off"><input type="checkbox" id="on" /><span></span></label>
+  </header>
+  <a class="upd" id="upd" hidden><b>✦ Update <span id="upd-v"></span> is out</b><span>Download from GitHub, replace your folder, hit reload</span></a>
+  <section class="np" id="np">
+    <div class="thumb" id="np-thumb"></div>
+    <div class="txt"><small>NOW PLAYING</small><b id="np-name">-</b><span id="np-sub"></span></div>
+    <button class="icon" id="next" title="Next config"><svg viewBox="0 0 24 24"><path d="M5 5l9 7-9 7zM18 5v14"/></svg></button>
+  </section>
+  <div class="row"><span>Animations</span><label class="switch"><input type="checkbox" id="fx" /><span></span></label></div>
+  <div class="label">Configs</div>
+  <div class="list" id="list"></div>
+  <footer>
+    <button class="btn solid" id="studio">Open Studio</button>
+    <button class="btn glass" id="chart">Open chart</button>
+  </footer>
+  <script src="common.js"></script>
+  <script src="studio/logo.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
