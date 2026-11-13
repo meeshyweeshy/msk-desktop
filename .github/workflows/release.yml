@@ -44,10 +44,12 @@ jobs:
       - run: npm ci
       - run: npx electron-builder --win nsis zip --x64 --publish never
       - name: Extension zip
-        shell: bash
+        shell: pwsh
         run: |
+          $env:MSK_NO_ZIP = "1"
           node scripts/build-extension.mjs
-          mv dist/MSK-extension.zip "dist/MSK-extension-${{ needs.check.outputs.version }}.zip"
+          Copy-Item dist/extension dist/MSK-extension -Recurse
+          Compress-Archive -Path dist/MSK-extension -DestinationPath "dist/MSK-extension-${{ needs.check.outputs.version }}.zip"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.check.outputs.version }}

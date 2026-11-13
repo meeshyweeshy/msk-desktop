@@ -52,7 +52,7 @@ const manifest = {
   },
 };
 fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 2));
-if (!test) {
+if (!test && !process.env.MSK_NO_ZIP) {
   fs.rmSync("dist/MSK-extension.zip", { force: true });
   execSync(`cd dist && cp -r extension MSK-extension && zip -q -r -9 MSK-extension.zip MSK-extension && rm -rf MSK-extension`);
 }
