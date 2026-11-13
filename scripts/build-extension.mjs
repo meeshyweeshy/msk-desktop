@@ -21,6 +21,8 @@ fs.copyFileSync("src/extension/shim.js", path.join(out, "studio/shim.js"));
 
 for (const f of ["common.js", "content.js", "bridge-main.js", "layer.html", "layer.js", "background.js", "popup.html", "popup.css", "popup.js"])
   fs.copyFileSync(path.join("src/extension", f), path.join(out, f));
+// common.js carries the shared checklist defaults/scoring so every extension context has them
+fs.writeFileSync(path.join(out, "common.js"), fs.readFileSync("src/renderer/checklist.js", "utf8") + "\n" + fs.readFileSync("src/extension/common.js", "utf8"));
 fs.copyFileSync("src/inject/engine.js", path.join(out, "engine.js"));
 
 const render = (svg, w) => new Resvg(svg, { fitTo: { mode: "width", value: w } }).render().asPng();
@@ -49,6 +51,7 @@ const manifest = {
     "toggle-bg": { suggested_key: { default: "Alt+Shift+M" }, description: "Turn background on/off" },
     "next-config": { suggested_key: { default: "Alt+Shift+Period" }, description: "Next config" },
     "toggle-fx": { suggested_key: { default: "Alt+Shift+Comma" }, description: "Pause/resume animations" },
+    "toggle-checklist": { suggested_key: { default: "Alt+Shift+K" }, description: "Show/hide the trading checklist" },
   },
 };
 fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 2));

@@ -60,7 +60,9 @@
     let cfg = d.preview || activeConfig(d);
     if (cfg && d.fxPaused) cfg = { ...cfg, fxOn: false };
     const m = cfg && cfg.bg.mediaId && d.media.find((x) => x.id === cfg.bg.mediaId);
-    return { on: !!d.enabled, fxMs: Math.round(1000 / ((d.settings && d.settings.fxFps) || 11)), cfg, media: m ? { id: m.id, type: m.type, rev: m.rev || 0 } : null, external: true };
+    const s = d.settings || {};
+    const checklist = g.MSK_CHECK ? { ...g.MSK_CHECK.normalize(s.checklist), accent: (s.appearance && s.appearance.accent) || "#39C5BB" } : null;
+    return { on: !!d.enabled, fxMs: Math.round(1000 / (s.fxFps || 11)), frameMs: Math.round(1000 / (s.bgFps || 30)), cfg, media: m ? { id: m.id, type: m.type, rev: m.rev || 0 } : null, external: true, checklist };
   }
   function nextId(d, pool) {
     const list = pool && pool.length ? pool : d.configs;

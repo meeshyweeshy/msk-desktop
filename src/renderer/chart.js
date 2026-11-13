@@ -40,18 +40,20 @@
     set(cfg) { this.cfg = cfg; this.draw(); }
     loop() {
       let last = 0, born = performance.now();
-      const step = (t) => {
+      // ~14 fps ticker; setTimeout instead of spinning requestAnimationFrame 60x a second
+      const step = () => {
         if (this.dead) return;
-        if (t - last > 70 && document.visibilityState === "visible" && this.cv.isConnected) {
+        const t = performance.now();
+        if (document.visibilityState === "visible" && this.cv.isConnected) {
           last = t;
           const b = this.bars[this.bars.length - 1];
           b.c += (this.r() - 0.5) * 4; b.h = Math.max(b.h, b.c); b.l = Math.min(b.l, b.c);
           if (t - born > 2600) { born = t; this.bars.shift(); const o = b.c; this.bars.push({ o, h: o, l: o, c: o }); }
           this.draw();
         }
-        requestAnimationFrame(step);
+        setTimeout(step, 70);
       };
-      requestAnimationFrame(step);
+      setTimeout(step, 70);
     }
     destroy() { this.dead = true; this.ro.disconnect(); }
     draw() {

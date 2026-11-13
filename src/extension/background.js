@@ -37,4 +37,5 @@ chrome.commands.onCommand.addListener(async (cmd) => {
   if (cmd === "toggle-bg") chrome.storage.local.set({ enabled: !d.enabled });
   if (cmd === "next-config") chrome.storage.local.set({ activeConfigId: MSKX.nextId(d), lastRotate: Date.now(), preview: null });
   if (cmd === "toggle-fx") chrome.storage.local.set({ fxPaused: !d.fxPaused });
+  if (cmd === "toggle-checklist") { const c = MSK_CHECK.normalize(d.settings.checklist); c.enabled = !c.enabled; chrome.storage.local.set({ settings: { ...d.settings, checklist: c } }); }
 });

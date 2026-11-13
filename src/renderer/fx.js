@@ -1,5 +1,6 @@
 // MSK animations. Shared by the app preview and the engine injected into TradingView.
-// An animation = { id, target, wave, period (s), min, max, phase (0-1), on }.
+// An animation = { id, target, wave, period (s), min, max, phase (0-1), on, curve?, bez? }.
+// curve shapes how the value travels between min and max (cubic-bezier, like CSS easing).
 (function (root) {
   const TARGETS = {
     opacity: { label: "Opacity", group: "Background", kind: "num", min: 0, max: 100, unit: "%", def: [40, 100], path: "bg.opacity", scale: 0.01 },
@@ -25,6 +26,44 @@
     sine: "Pulse", triangle: "Ramp", saw: "Cycle", square: "Flash", strobe: "Strobe",
     heartbeat: "Heartbeat", flicker: "Flicker", random: "Random",
   };
+
+  // ---------- curves ----------
+  const CURVES = {
+    linear: { label: "Linear", bez: [0, 0, 1, 1] },
+    easeInOut: { label: "Smooth", bez: [0.42, 0, 0.58, 1] },
+    easeIn: { label: "Ease in", bez: [0.42, 0, 1, 1] },
+    easeOut: { label: "Ease out", bez: [0, 0, 0.58, 1] },
+    snap: { label: "Snap", bez: [0.85, 0, 0.15, 1] },
+    overshoot: { label: "Overshoot", bez: [0.34, 1.56, 0.64, 1] },
+    custom: { label: "Custom", bez: null },
+  };
+  // y(x) for a cubic-bezier with fixed ends (0,0) and (1,1), baked into a lookup table once.
+  const LUTS = new Map();
+  function bezLUT(b) {
+    const key = b.join(",");
+    let lut = LUTS.get(key);
+    if (lut) return lut;
+    const [x1, y1, x2, y2] = b, N = 128;
+    const bx = (t) => 3 * (1 - t) * (1 - t) * t * x1 + 3 * (1 - t) * t * t * x2 + t * t * t;
+    const by = (t) => 3 * (1 - t) * (1 - t) * t * y1 + 3 * (1 - t) * t * t * y2 + t * t * t;
+    lut = new Float32Array(N + 1);
+    for (let i = 0; i <= N; i++) {
+      const x = i / N; let lo = 0, hi = 1, t = x;
+      for (let k = 0; k < 22; k++) { t = (lo + hi) / 2; if (bx(t) < x) lo = t; else hi = t; }
+      lut[i] = by(t);
+    }
+    if (LUTS.size > 64) LUTS.clear();
+    LUTS.set(key, lut);
+    return lut;
+  }
+  function curveOf(a) {
+    const c = a && a.curve;
+    if (!c || c === "linear") return null;
+    const b = c === "custom" ? a.bez : CURVES[c] && CURVES[c].bez;
+    if (!Array.isArray(b) || b.length !== 4 || b.some((n) => typeof n !== "number" || !isFinite(n))) return null;
+    const lut = bezLUT([Math.min(1, Math.max(0, b[0])), b[1], Math.min(1, Math.max(0, b[2])), b[3]]);
+    return (v) => { v = v < 0 ? 0 : v > 1 ? 1 : v; const f = v * 128, i = f | 0; return i >= 128 ? lut[128] : lut[i] + (lut[i + 1] - lut[i]) * (f - i); };
+  }
 
   const fract = (x) => x - Math.floor(x);
   const hash = (n) => fract(Math.sin(n * 12.9898 + 78.233) * 43758.5453);
@@ -76,8 +115,10 @@
     for (const a of cfg.fx) {
       const T = a && a.on && TARGETS[a.target]; if (!T) continue;
       const period = Math.max(0.05, +a.period || 1), x = t / period + (+a.phase || 0), p = fract(x);
-      const v = +a.min + (+a.max - +a.min) * wave(a.wave, p, x, seedOf(a.id));
-      if (T.kind === "num") { const ks = T.path.split("."), last = ks.pop(); ks.reduce((o, k) => o[k], out)[last] = v * T.scale; continue; }
+      let w = wave(a.wave, p, x, seedOf(a.id));
+      const cf = curveOf(a); if (cf) w = cf(w);
+      let v = +a.min + (+a.max - +a.min) * w;
+      if (T.kind === "num") { v = Math.min(T.max, Math.max(T.min, v)); const ks = T.path.split("."), last = ks.pop(); ks.reduce((o, k) => o[k], out)[last] = v * T.scale; continue; }
       const hex = hsl2hex(v, 0.88, T.l || 0.6) + (T.alpha || "");
       if (T.bg) out.bg[T.bg] = hex;
       if (T.base) { out.bg.base[T.base] = hsl2hex(v, 0.75, T.l); if (out.bg.base.mode === "tv") out.bg.base.mode = "solid"; }
@@ -88,5 +129,12 @@
     return out;
   }
 
-  root.MSK_FX = { TARGETS, WAVES, apply, active, wave, hsl2hex, baseCSS, DEFAULT_BASE };
+  // One period of an animation after its curve, for drawing previews (values 0-1, may overshoot).
+  function sample(a, n = 96) {
+    const cf = curveOf(a), seed = seedOf(a && a.id), out = new Array(n);
+    for (let i = 0; i < n; i++) { const p = i / (n - 1); let w = wave(a.wave, p >= 1 ? 0.9999 : p, p * 1, seed); if (cf) w = cf(w); out[i] = w; }
+    return out;
+  }
+
+  root.MSK_FX = { TARGETS, WAVES, CURVES, apply, active, wave, curveOf, sample, hsl2hex, baseCSS, DEFAULT_BASE };
 })(typeof window !== "undefined" ? window : globalThis);

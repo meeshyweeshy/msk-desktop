@@ -137,36 +137,110 @@
     return s;
   }
 
+  // ---------- animation curve editor ----------
+  // Drag the two handles (or pick a preset) to shape how a value moves between From and To.
+  function curveEditor(a, onChange) {
+    const C = MSK_FX.CURVES;
+    const w = el(`<div class="curve">
+      <div class="curve-top"><span class="curve-lbl">Curve</span><div class="curves">${Object.entries(C).map(([k, c]) => `<button class="cv ${(a.curve || "linear") === k ? "on" : ""}" data-c="${k}">${c.label}</button>`).join("")}</div></div>
+      <div class="curve-body"><canvas class="bez-ed" title="Drag the dots"></canvas><div class="curve-side"><canvas class="wave-pv"></canvas><span class="bez-txt mono"></span></div></div></div>`);
+    const ed = $(".bez-ed", w), pv = $(".wave-pv", w), txt = $(".bez-txt", w);
+    const Y0 = -0.6, Y1 = 1.6, PAD = 10;
+    const bez = () => (a.curve === "custom" && Array.isArray(a.bez) ? a.bez : (C[a.curve || "linear"] || C.linear).bez || [0, 0, 1, 1]);
+    const fit = (cv) => { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; if (!r.width) return null; if (cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); } const x = cv.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); return { x, W: r.width, H: r.height }; };
+    const css = (n, f) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
+    function draw() {
+      const b = bez(), acc = css("--miku", "#39c5bb"), fg = css("--fg-3", "rgba(255,255,255,.4)"), line = css("--line-2", "rgba(255,255,255,.18)");
+      txt.textContent = `cubic-bezier(${b.map((n) => +n.toFixed(2)).join(", ")})`;
+      let c = fit(ed);
+      if (c) {
+        const { x, W, H } = c, px = (v) => PAD + v * (W - PAD * 2), py = (v) => PAD + (1 - (v - Y0) / (Y1 - Y0)) * (H - PAD * 2);
+        x.clearRect(0, 0, W, H);
+        x.strokeStyle = line; x.lineWidth = 1; x.setLineDash([3, 4]);
+        x.beginPath(); x.moveTo(px(0), py(0)); x.lineTo(px(1), py(0)); x.moveTo(px(0), py(1)); x.lineTo(px(1), py(1)); x.stroke(); x.setLineDash([]);
+        x.strokeStyle = fg; x.beginPath(); x.moveTo(px(0), py(0)); x.lineTo(px(b[0]), py(b[1])); x.moveTo(px(1), py(1)); x.lineTo(px(b[2]), py(b[3])); x.stroke();
+        x.strokeStyle = acc; x.lineWidth = 2.5; x.beginPath(); x.moveTo(px(0), py(0)); x.bezierCurveTo(px(b[0]), py(b[1]), px(b[2]), py(b[3]), px(1), py(1)); x.stroke();
+        for (const [hx, hy] of [[b[0], b[1]], [b[2], b[3]]]) { x.fillStyle = acc; x.beginPath(); x.arc(px(hx), py(hy), 6, 0, 7); x.fill(); x.strokeStyle = css("--bg", "#000"); x.lineWidth = 2; x.stroke(); }
+      }
+      c = fit(pv);
+      if (c) {
+        const { x, W, H } = c, s = MSK_FX.sample(a, Math.max(24, Math.round(W / 2)));
+        let lo = Math.min(0, ...s), hi = Math.max(1, ...s);
+        const py = (v) => 4 + (1 - (v - lo) / (hi - lo)) * (H - 8);
+        x.clearRect(0, 0, W, H);
+        x.fillStyle = css("--field", "rgba(255,255,255,.06)"); x.fillRect(0, 0, W, H);
+        const grd = x.createLinearGradient(0, 0, 0, H); grd.addColorStop(0, acc); grd.addColorStop(1, "transparent");
+        x.beginPath(); s.forEach((v, i) => { const X = (i / (s.length - 1)) * W; i ? x.lineTo(X, py(v)) : x.moveTo(X, py(v)); });
+        x.strokeStyle = acc; x.lineWidth = 2; x.stroke();
+        x.lineTo(W, H); x.lineTo(0, H); x.closePath(); x.globalAlpha = 0.18; x.fillStyle = grd; x.fill(); x.globalAlpha = 1;
+      }
+    }
+    let raf = 0;
+    const redraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; draw(); }); };
+    $(".curves", w).onclick = (e) => {
+      const btn = e.target.closest(".cv"); if (!btn) return;
+      const k = btn.dataset.c;
+      if (k === "custom" && !Array.isArray(a.bez)) a.bez = [...bez()];
+      a.curve = k; $$(".cv", w).forEach((x) => x.classList.toggle("on", x === btn)); redraw(); onChange();
+    };
+    ed.addEventListener("pointerdown", (e) => {
+      const r = ed.getBoundingClientRect(), b = [...bez()];
+      const toV = (ev) => [Math.min(1, Math.max(0, (ev.clientX - r.left - PAD) / (r.width - PAD * 2))), Math.min(Y1, Math.max(Y0, Y0 + (1 - (ev.clientY - r.top - PAD) / (r.height - PAD * 2)) * (Y1 - Y0)))];
+      const [vx, vy] = toV(e), d1 = Math.hypot(vx - b[0], (vy - b[1]) / 2), d2 = Math.hypot(vx - b[2], (vy - b[3]) / 2);
+      const h = d1 <= d2 ? 0 : 2;
+      ed.setPointerCapture(e.pointerId);
+      a.curve = "custom"; a.bez = b; $$(".cv", w).forEach((x) => x.classList.toggle("on", x.dataset.c === "custom"));
+      let t = 0;
+      const mv = (ev) => { const [nx, ny] = toV(ev); a.bez[h] = +nx.toFixed(3); a.bez[h + 1] = +ny.toFixed(3); redraw(); if (!t) t = setTimeout(() => { t = 0; onChange(); }, 40); };
+      mv(e);
+      ed.onpointermove = mv;
+      ed.onpointerup = ed.onpointercancel = () => { ed.onpointermove = null; clearTimeout(t); t = 0; onChange(); };
+    });
+    new ResizeObserver(redraw).observe(ed);
+    requestAnimationFrame(draw);
+    return { el: w, redraw };
+  }
+
   // ---------- preview stage ----------
   function Stage({ animate = false, interactive = false, seed = 7, playVideo = animate, fx = animate } = {}) {
-    const root = el(`<div class="stage"><div class="layer m-wrap"><div class="layer tint"></div><div class="layer vig"></div></div><canvas></canvas></div>`);
-    const wrap = $(".m-wrap", root), tint = $(".tint", root), vig = $(".vig", root);
+    const root = el(`<div class="stage"><div class="layer base"></div><div class="layer m-wrap"><div class="layer tint"></div><div class="layer vig"></div></div><canvas></canvas></div>`);
+    const wrap = $(".m-wrap", root), tint = $(".tint", root), vig = $(".vig", root), baseL = $(".base", root);
+    // only write styles that changed; the gradient lives on its own layer so angle/color edits repaint just that
+    const st = (e, k, v) => { const c = e.__c || (e.__c = {}); v = String(v); if (c[k] !== v) { c[k] = v; e.style[k] = v; } };
+    const r3 = (n) => Math.round(n * 1000) / 1000;
     const chart = new MSKChart($("canvas", root), { animate, interactive, seed });
     let key = null, media = null, cur = null, raf = null, dead = false, lastDraw = 0;
+    let w0 = 0;
     function look(c) {
       const bg = c.bg, behind = bg.mode === "behind";
-      root.classList.toggle("overlay", !behind);
-      root.style.background = behind ? (MSK_FX.baseCSS(bg.base) || "#131722") : "#000";
-      wrap.style.opacity = behind ? 1 : bg.opacity;
+      if (root.classList.contains("overlay") === behind) root.classList.toggle("overlay", !behind);
+      st(baseL, "background", behind ? (MSK_FX.baseCSS(bg.base) || "#131722") : "#000");
+      st(wrap, "opacity", behind ? 1 : r3(bg.opacity));
       if (media) {
-        const w = root.clientWidth || 600, z = Math.max(bg.blur > 0 ? 1.06 : 1, bg.zoom || 1);
-        media.style.objectFit = bg.fit === "stretch" ? "fill" : bg.fit;
-        media.style.objectPosition = bg.position;
-        media.style.filter = `blur(${(bg.blur * w) / 1600}px) brightness(${bg.brightness}) saturate(${bg.saturation})${bg.hue ? ` hue-rotate(${bg.hue}deg)` : ""}`;
-        media.style.transform = z > 1 ? `scale(${z})` : "none";
-        media.style.opacity = behind ? bg.opacity : 1;
-        if (media.tagName === "VIDEO") media.playbackRate = bg.speed || 1;
+        const w = w0 || (w0 = root.clientWidth || 600), z = Math.max(bg.blur > 0 ? 1.06 : 1, bg.zoom || 1);
+        st(media, "objectFit", bg.fit === "stretch" ? "fill" : bg.fit);
+        st(media, "objectPosition", bg.position);
+        st(media, "filter", `blur(${r3((bg.blur * w) / 1600)}px) brightness(${r3(bg.brightness)}) saturate(${r3(bg.saturation)})${bg.hue ? ` hue-rotate(${Math.round(bg.hue)}deg)` : ""}`);
+        st(media, "transform", z > 1 ? `scale(${r3(z)})` : "none");
+        st(media, "opacity", behind ? r3(bg.opacity) : 1);
+        if (media.tagName === "VIDEO" && media.playbackRate !== (bg.speed || 1)) media.playbackRate = bg.speed || 1;
       }
-      tint.style.background = bg.tint; tint.style.opacity = bg.tintStrength;
-      vig.style.background = bg.vignette > 0 ? `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${bg.vignette}) 100%)` : "none";
+      st(tint, "background", bg.tint); st(tint, "opacity", r3(bg.tintStrength));
+      st(vig, "background", bg.vignette > 0 ? `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${r3(bg.vignette)}) 100%)` : "none");
     }
+    let lastLook = 0;
     function tick(now) {
       raf = null;
-      if (dead || !cur || !root.isConnected) return;
-      if (!MSK_FX.active(cur).any || S.fxPaused) { look(cur); chart.set(cur); return; }
-      const live = MSK_FX.apply(cur, now / 1000);
-      look(live);
-      if (now - lastDraw > 40) { lastDraw = now; chart.set(live); }
+      if (dead || !cur || !root.isConnected) { root.classList.remove("fxing"); return; }
+      if (!MSK_FX.active(cur).any || S.fxPaused) { root.classList.remove("fxing"); look(cur); chart.set(cur); return; }
+      root.classList.add("fxing");
+      const frame = 1000 / ((S.settings && S.settings.bgFps) || 30);
+      if (now - lastLook >= frame - 2) {
+        lastLook = now;
+        const live = MSK_FX.apply(cur, now / 1000);
+        look(live);
+        if (now - lastDraw > 66) { lastDraw = now; chart.set(live); }
+      }
       raf = requestAnimationFrame(tick);
     }
     function set(cfg) {
@@ -182,7 +256,7 @@
           wrap.prepend(media);
         }
       }
-      look(cfg); chart.set(cfg);
+      w0 = 0; look(cfg); chart.set(cfg);
       if (fx && !raf && MSK_FX.active(cfg).any && !S.fxPaused) raf = requestAnimationFrame(tick);
     }
     return { root, set, destroy() { dead = true; chart.destroy(); if (media && media.pause) media.pause(); } };
@@ -392,7 +466,15 @@
     else if (!W.draft) { const c = activeCfg(); W.draft = clone(c); W.sourceId = c.id; W.dirty = false; }
   }
   let liveT;
-  function pushLive() { if (!W.live) return; clearTimeout(liveT); liveT = setTimeout(() => api.config.preview(W.draft), 70); }
+  // live preview on TradingView: at most one push every 60 ms while you drag, plus a final one
+  let liveLast = 0;
+  function pushLive() {
+    if (!W.live) return;
+    const wait = 60 - (performance.now() - liveLast);
+    clearTimeout(liveT);
+    const go = () => { liveLast = performance.now(); api.config.preview(W.draft); };
+    if (wait <= 0) go(); else liveT = setTimeout(go, wait);
+  }
 
   pages.editor = {
     mount(v, opts) {
@@ -442,7 +524,11 @@
       if (W.live) pushLive();
     },
     remount() { const v = $("#view"); this.leave(true); v.innerHTML = ""; const host = document.createElement("div"); v.appendChild(host); this.mount(host); },
-    changed(initial) { this.stage.set(W.draft); if (!initial) { W.dirty = true; pushLive(); } },
+    changed(initial) {
+      if (initial) this.stage.set(W.draft);
+      else if (!this.raf) this.raf = requestAnimationFrame(() => { this.raf = null; this.stage && this.stage.set(W.draft); });
+      if (!initial) { W.dirty = true; pushLive(); }
+    },
     strip() {
       const d = W.draft, s = $("#w-strip");
       s.innerHTML = `<div class="s-item none ${!d.bg.mediaId ? "on" : ""}" data-act="media" data-id="">None</div>` +
@@ -593,7 +679,9 @@
           $(".fx-sw", card).replaceWith(sw(a.on, (on) => { a.on = on; fxChanged(); }));
           $(".fx-sel", card).onchange = (e) => { const nt = FXT[e.target.value]; a.target = e.target.value; a.min = nt.def[0]; a.max = nt.def[1]; renderFx(); fxChanged(); };
           $(".btn.danger", card).onclick = () => { d.fx.splice(i, 1); renderFx(); fxChanged(); };
-          $(".waves", card).onclick = (e) => { const b = e.target.closest(".wv"); if (!b) return; a.wave = b.dataset.w; $$(".wv", card).forEach((x) => x.classList.toggle("on", x === b)); fxChanged(); };
+          const ce = curveEditor(a, () => fxChanged());
+          $(".waves", card).onclick = (e) => { const b = e.target.closest(".wv"); if (!b) return; a.wave = b.dataset.w; $$(".wv", card).forEach((x) => x.classList.toggle("on", x === b)); ce.redraw(); fxChanged(); };
+          card.appendChild(ce.el);
           const u = (x) => Math.round(x) + T.unit;
           card.appendChild(slider("Speed (seconds per cycle)", `fx.${i}.period`, 0.1, 20, 0.1, (x) => x.toFixed(1) + "s"));
           card.appendChild(slider(T.kind === "color" ? "From hue" : "From", `fx.${i}.min`, T.min, T.max, 1, u));
@@ -711,6 +799,7 @@
           </section>
           <section class="set-sec glass" id="sec-look" style="--i:1"><h3>${I.moon}Appearance</h3>
             ${R(I.moon, "Theme", "Black or white app look", "theme")}
+            ${R(I.layers, "Visual effects", "Full has the most glass and glow. Light turns off blur for slower computers.", "visual")}
             ${R(I.star, "Accent color", "Buttons, toggles, highlights and the logo glow", "uiAccent")}
             ${R(I.wand, "Glow color", "The soft light drifting behind the app", "uiGlow")}
             ${R(I.layers, "Background color", "App background for the current theme. Leave on default to follow the theme.", "uiBg")}
@@ -732,12 +821,14 @@
           <section class="set-sec glass" id="sec-fx" style="--i:2"><h3>${I.wand}Animations</h3>
             ${R(I.wand, "Animations on", "Master switch for every config's FX", "fxOn")}
             ${R(I.bolt, "Chart color speed", "How often animated candle colors update on TradingView. Lower is lighter on your computer.", "fxFps")}
+            ${R(I.play, "Background frame rate", "How smooth background animations run. 30 is plenty; 60 costs more.", "bgFps")}
           </section>
           <section class="set-sec glass" id="sec-keys" style="--i:3"><h3>${I.keyboard}Hotkeys</h3>
             <div class="faint" style="font-size:12px;margin:-4px 0 6px">${EXT ? "Chrome shortcuts. Change them on Chrome's shortcuts page." : `Work anywhere ${isMac() ? "on your Mac" : "in Windows"}. Click a shortcut, press the new keys. Backspace clears it.`}</div>
             ${R(I.power, "Toggle background", "Turns your background on or off", "hk-toggle")}
             ${R(I.next, "Next config", "Jumps to the next config", "hk-next")}
             ${R(I.wand, "Pause animations", "Freezes all FX instantly", "hk-fx")}
+            ${R(I.check, "Show / hide checklist", "Toggles the trading checklist on your chart", "hk-check")}
             ${R(I.search, "Command palette", "Inside MSK only", "hk-pal")}
             ${EXT ? R(I.keyboard, "Change shortcuts", "Opens Chrome's extension shortcuts page", "hk-edit") : ""}
           </section>
@@ -767,6 +858,7 @@
       const setSw = (key) => sw(!!S.settings[key], (on) => api.settings({ [key]: on }));
       put("startup", setSw("startup")); put("startHidden", setSw("startHidden")); put("closeToTray", setSw("closeToTray"));
       put("theme", seg([["dark", "Black"], ["light", "White"]], s.theme, (t) => api.settings({ theme: t })));
+      put("visual", seg([["full", "Full"], ["balanced", "Balanced"], ["light", "Light"]], s.visual || "balanced", (x) => api.settings({ visual: x })));
       // appearance: preview live while picking, save when done
       const look = { ...appearance() };
       const saveLook = () => api.settings({ appearance: { ...look } });
@@ -814,8 +906,9 @@
       put("shortcut", btn(`${I.plus}Add`, "glass bubble", async () => { const r = await api.tv.shortcut(); toast(r.message, r.ok ? "ok" : "warn"); }));
       put("resetCopy", btn(`${I.refresh}Refresh`, "ghost", async () => { if (await modal({ title: "Refresh the copy?", text: "TradingView will close. MSK rebuilds its copy next time it needs it.", ok: "Refresh" })) { await api.tv.resetCopy(); toast("Copy cleared"); } }));
       put("fxOn", sw(!S.fxPaused, (on) => api.fxPause(!on)));
+      put("bgFps", seg([["20", "20 fps"], ["30", "30 fps"], ["60", "60 fps"]], String(s.bgFps || 30), (f) => api.settings({ bgFps: +f })));
       put("fxFps", seg([["6", "Light"], ["11", "Normal"], ["20", "Smooth"]], String(s.fxFps || 11), (f) => api.settings({ fxFps: +f })));
-      for (const k of ["toggle", "next", "fx"]) put("hk-" + k, EXT ? el(`<span class="keys">${keycaps(S.settings.hotkeys[k])}</span>`) : hotkeyBox(k));
+      for (const k of ["toggle", "next", "fx", "check"]) put("hk-" + k, EXT ? el(`<span class="keys">${keycaps(S.settings.hotkeys[k])}</span>`) : hotkeyBox(k));
       if (EXT) put("hk-edit", btn("Open", "glass bubble", () => api.tv.shortcuts()));
       put("hk-pal", el(`<span class="keys">${keycaps(isMac() ? "CommandOrControl+K" : "Ctrl+K")}</span>`));
       put("showLogs", sw(s.showLogs !== false, (on) => api.settings({ showLogs: on })));
@@ -934,6 +1027,131 @@
     const k = await api.tv.kill();
     toast(k && k.length ? `Killed ${k.length} process${k.length > 1 ? "es" : ""}` : "Nothing was running");
   }
+  // CHECKLIST
+  // A pre-trade checklist that shows on your TradingView chart. Tick items there or here; the score
+  // adds up the points and tells you if the setup meets your minimum.
+  function checklistCard(c, { interactive = false, onToggle } = {}) {
+    const sc = MSK_CHECK.score(c), set = new Set(c.checked);
+    const scoreTxt = c.scoreStyle === "percent" ? sc.pct + "%" : c.scoreStyle === "grade" ? sc.grade : `${sc.got}/${sc.total}`;
+    const cls = sc.ready === null ? "" : sc.ready ? "ready" : "wait";
+    const w = el(`<div class="ckc ${c.collapsed ? "min" : ""}" style="${(+c.scale || 1) !== 1 ? `zoom:${+c.scale};` : ""}opacity:${Math.max(0.3, Math.min(1, +c.opacity || 1))}">
+      <div class="hd"><span class="t">${esc(c.title || "Checklist")}</span>${c.showScore !== false ? `<span class="sc ${cls}">${scoreTxt}</span>` : ""}<span class="ic">${c.collapsed ? "+" : "–"}</span></div>
+      <div class="list">${(c.items || []).map((it) => `<button class="it ${set.has(it.id) ? "on" : ""}" data-id="${esc(it.id)}"><span class="bx"></span><span class="tx">${esc(it.text || "Untitled")}</span>${c.showScore !== false ? `<span class="pt">+${+it.pts || 0}</span>` : ""}</button>`).join("")}</div>
+      <div class="ft"><span class="st ${cls}">${sc.ready === null ? `${sc.got} of ${sc.total} points` : sc.ready ? "Ready: setup meets your minimum" : `Wait: ${sc.min - sc.got} more point${sc.min - sc.got === 1 ? "" : "s"} needed`}</span><span class="rs">Reset</span></div></div>`);
+    if (interactive) w.onclick = (e) => { const it = e.target.closest(".it"); if (it) onToggle(it.dataset.id); else if (e.target.closest(".rs")) onToggle(null); };
+    return w;
+  }
+  pages.checklist = {
+    mount(v) {
+      const self = this;
+      this.d = MSK_CHECK.normalize(S.settings.checklist);
+      const d = this.d;
+      let saveT = null;
+      const save = (now) => { clearTimeout(saveT); const go = () => api.settings({ checklist: { ...self.d } }); if (now) go(); else saveT = setTimeout(go, 280); };
+      const change = (now = true) => { this.paint(); save(now); };
+      v.innerHTML = `<div class="page ck-page">
+        <div class="page-head"><div class="left"><div class="eyebrow">Trading</div><h2 class="title">Checklist</h2></div>
+          <label class="row ck-show"><span>Show on chart</span><span id="ck-on"></span></label></div>
+        <div class="ck-grid stagger">
+          <div class="ck-left" style="--i:0">
+            <div class="ck-stage glass"><div class="ck-chart"></div><div id="ck-prev"></div></div>
+            <div class="ck-score glass" id="ck-score"></div>
+            <div class="faint" style="font-size:12px;line-height:1.5">Tick items here or right on your TradingView chart. Drag the card's title bar on the chart to move it. ${isExt() ? "Shortcut: Alt+Shift+K" : `Shortcut: ${hkShow(S.settings.hotkeys.check)}`} shows or hides it.</div>
+          </div>
+          <div class="ck-right">
+            <section class="glass set-sec" style="--i:1"><h3>${I.list}Items</h3>
+              <input class="field ck-title" placeholder="Checklist title" maxlength="40" />
+              <div class="ck-items"></div>
+              <button class="btn glass bubble sm" data-act="add" style="align-self:flex-start">${I.plus}Add item</button>
+            </section>
+            <section class="glass set-sec" style="--i:2"><h3>${I.star}Score</h3>
+              <div class="set-row"><span class="row-ico">${I.eye}</span><div class="t"><b>Show score</b><small>Points next to each item and a total in the title bar</small></div><span data-c="showScore"></span></div>
+              <div class="set-row"><span class="row-ico">${I.chart}</span><div class="t"><b>Score style</b><small>How the total is shown</small></div><span data-c="style"></span></div>
+              <div class="set-row"><span class="row-ico">${I.check}</span><div class="t"><b>Minimum to trade</b><small>Below this the card says Wait. 0 turns it off.</small></div><span data-c="min"></span></div>
+              <div class="set-row"><span class="row-ico">${I.clock}</span><div class="t"><b>Clear ticks</b><small>Start fresh each day or keep them until you reset</small></div><span data-c="auto"></span></div>
+            </section>
+            <section class="glass set-sec" style="--i:3"><h3>${I.layers}On the chart</h3>
+              <div class="set-row"><span class="row-ico">${I.layers}</span><div class="t"><b>Position</b><small id="ck-pos-sub">Corner of the chart window</small></div><span data-c="pos"></span></div>
+              <div class="set-row"><span class="row-ico">${I.image}</span><div class="t"><b>Size</b><small>Scale of the card</small></div><span data-c="size"></span></div>
+              <div class="set-row"><span class="row-ico">${I.eye}</span><div class="t"><b>Opacity</b><small>See your chart through the card</small></div><span data-c="opacity"></span></div>
+              <div class="set-row"><span class="row-ico">${I.layers}</span><div class="t"><b>Start collapsed</b><small>Only the title and score until you open it</small></div><span data-c="collapsed"></span></div>
+            </section>
+          </div>
+        </div></div>`;
+      const put = (id, node) => { const ph = $(`[data-c="${id}"]`, v); if (ph) ph.replaceWith(node); };
+      const sws = {};
+      const swPut = (id, key) => { sws[key] = sw(!!d[key], (on) => { self.d[key] = on; change(); }); put(id, sws[key]); };
+      this.onSw = sw(d.enabled, (on) => { self.d.enabled = on; change(); toast(on ? "Checklist is on your chart" : "Checklist hidden"); });
+      $("#ck-on", v).replaceWith(this.onSw);
+      swPut("showScore", "showScore"); swPut("collapsed", "collapsed");
+      put("style", seg([["points", "Points"], ["percent", "Percent"], ["grade", "Grade"]], d.scoreStyle, (x) => { self.d.scoreStyle = x; change(); }));
+      put("min", stepper(d.minScore, 0, 99, 1, "pts", (n) => { self.d.minScore = n; change(); }));
+      put("auto", seg([["day", "Every day"], ["never", "Only on reset"]], d.autoReset, (x) => { self.d.autoReset = x; change(); }));
+      this.posSeg = () => seg([["tl", "Top left"], ["tr", "Top right"], ["bl", "Bottom left"], ["br", "Bottom right"]], self.d.pos ? "" : d.position, (x) => { self.d.position = x; self.d.pos = null; change(); self.posSub(); });
+      put("pos", el(`<span class="ck-pos"></span>`)); $(".ck-pos", v).appendChild(this.posSeg());
+      this.posSub = () => { const s2 = $("#ck-pos-sub", v); if (s2) s2.textContent = self.d.pos ? "Moved by hand on the chart. Pick a corner to snap it back." : "Corner of the chart window"; };
+      this.posSub();
+      put("size", seg([["0.85", "Small"], ["1", "Normal"], ["1.15", "Large"]], String(d.scale || 1), (x) => { self.d.scale = +x; change(); }));
+      const op = el(`<input type="range" min="30" max="100" step="1" value="${Math.round((d.opacity || 1) * 100)}" style="width:160px" />`);
+      const paintOp = () => op.style.setProperty("--p", ((op.value - 30) / 70) * 100 + "%");
+      op.oninput = () => { paintOp(); self.d.opacity = op.value / 100; change(false); }; paintOp();
+      put("opacity", op);
+      const title = $(".ck-title", v); title.value = d.title || "";
+      title.oninput = () => { self.d.title = title.value; change(false); };
+      $('[data-act="add"]', v).onclick = () => { self.d.items.push({ id: Math.random().toString(36).slice(2, 8), text: "", pts: 1 }); self.items(); change(); const ins = $$(".ck-text", v); ins[ins.length - 1] && ins[ins.length - 1].focus(); };
+      this.items = () => {
+        const box = $(".ck-items", v); box.innerHTML = "";
+        self.d.items.forEach((it, i) => {
+          const row = el(`<div class="ck-item"><span class="ck-n">${i + 1}</span><input class="field ck-text" placeholder="What has to be true?" maxlength="60" /><span class="ck-pts"></span>
+            <button class="btn ghost sm icon" data-m="-1" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button><button class="btn ghost sm icon" data-m="1" title="Move down" ${i === self.d.items.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="btn ghost sm icon danger" data-del="1" title="Remove">${I.trash}</button></div>`);
+          const t = $(".ck-text", row); t.value = it.text || "";
+          t.oninput = () => { it.text = t.value; change(false); };
+          $(".ck-pts", row).replaceWith(stepper(+it.pts || 0, 0, 10, 1, "pts", (n) => { it.pts = n; change(); }));
+          row.onclick = (e) => {
+            const m = e.target.closest("[data-m]"), del = e.target.closest("[data-del]");
+            if (m) { const j = i + +m.dataset.m; if (j < 0 || j >= self.d.items.length) return; const arr = self.d.items; [arr[i], arr[j]] = [arr[j], arr[i]]; self.items(); change(); }
+            if (del) { self.d.items.splice(i, 1); self.d.checked = self.d.checked.filter((x) => x !== it.id); self.items(); change(); }
+          };
+          box.appendChild(row);
+        });
+        if (!self.d.items.length) box.appendChild(el(`<div class="faint" style="font-size:12.5px;padding:6px 2px">No items yet. Add what your setup needs before you take a trade.</div>`));
+      };
+      this.items();
+      const st = Stage({ seed: 31 }); st.set(activeCfg() || DEFAULT_CFG()); $(".ck-chart", v).appendChild(st.root); this.stage = st;
+      this.toggle = (id) => {
+        if (id === null) self.d.checked = [];
+        else { const set2 = new Set(self.d.checked); set2.has(id) ? set2.delete(id) : set2.add(id); self.d.checked = self.d.items.map((x) => x.id).filter((x) => set2.has(x)); }
+        self.d.checkedDay = MSK_CHECK.today(); change();
+      };
+      this.paint();
+    },
+    paint() {
+      const v = $("#view"), p = $("#ck-prev", v); if (!p) return;
+      const d = this.d;
+      p.innerHTML = ""; p.className = "ck-pos-" + (d.position || "tl");
+      p.appendChild(checklistCard({ ...d, collapsed: false }, { interactive: true, onToggle: (id) => this.toggle(id) }));
+      const sc = MSK_CHECK.score(d), box = $("#ck-score", v);
+      box.innerHTML = `<div class="ck-big"><b>${sc.got}<small>/${sc.total}</small></b><span>points</span></div>
+        <div class="ck-big"><b>${sc.pct}<small>%</small></b><span>score</span></div>
+        <div class="ck-big"><b>${sc.grade}</b><span>grade</span></div>
+        <div class="ck-verdict ${sc.ready === null ? "" : sc.ready ? "ready" : "wait"}">${sc.ready === null ? "No minimum set" : sc.ready ? "Ready to trade" : `Wait · ${sc.min - sc.got} more`}</div>
+        <button class="btn ghost sm" data-ck="reset">${I.refresh}Reset ticks</button>`;
+      $('[data-ck="reset"]', box).onclick = () => this.toggle(null);
+      if (this.onSw && this.onSw.querySelector("input")) this.onSw.querySelector("input").checked = !!d.enabled;
+    },
+    update() {
+      // ticks / moves made on the chart come back through the state; keep whatever you're typing
+      if (!this.d) return;
+      const n = MSK_CHECK.normalize(S.settings.checklist);
+      const same = JSON.stringify([n.checked, n.collapsed, n.pos, n.enabled]) === JSON.stringify([this.d.checked, this.d.collapsed, this.d.pos, this.d.enabled]);
+      if (same) return;
+      Object.assign(this.d, { checked: n.checked, checkedDay: n.checkedDay, collapsed: n.collapsed, pos: n.pos, enabled: n.enabled });
+      this.paint(); this.posSub && this.posSub();
+    },
+    leave() { this.stage && this.stage.destroy(); this.d = null; },
+  };
+
   pages.logs = {
     async mount(v) {
       v.innerHTML = `<div class="page">
@@ -991,13 +1209,14 @@
     const items = () => [
       ...S.configs.map((c) => ({ g: "Apply config", label: c.name, hint: c.id === S.activeConfigId ? "Active" : c.bg.mode === "behind" ? "Behind" : "Overlay", icon: I.layers, run: () => { api.config.activate(c.id); toast(`${c.name} applied`); } })),
       ...S.configs.map((c) => ({ g: "Edit config", label: "Edit " + c.name, icon: I.edit, run: () => go("editor", { configId: c.id }) })),
-      ...[["home", "Home", I.home], ["library", "Library", I.image], ["editor", "Editor", I.wand], ["configs", "Configs", I.layers], ["logs", "Logs", I.list], ["settings", "Settings", I.keyboard]]
+      ...[["home", "Home", I.home], ["library", "Library", I.image], ["editor", "Editor", I.wand], ["configs", "Configs", I.layers], ["checklist", "Checklist", I.check], ["logs", "Logs", I.list], ["settings", "Settings", I.keyboard]]
         .filter(([p]) => !(isExt() && p === "logs")).map(([p, l, ic]) => ({ g: "Go to", label: l, icon: ic, run: () => go(p) })),
       { g: "Actions", label: S.enabled ? "Turn background off" : "Turn background on", icon: I.power, run: () => api.setEnabled(!S.enabled) },
       { g: "Actions", label: S.fxPaused ? "Resume animations" : "Pause animations", icon: I.wand, run: () => api.fxPause(!S.fxPaused) },
       { g: "Actions", label: "Next config", icon: I.next, run: () => api.config.next() },
       { g: "Actions", label: "Add media", icon: I.upload, run: () => importMedia() },
       { g: "Actions", label: "New config", icon: I.plus, run: () => go("editor", { fresh: true }) },
+      { g: "Actions", label: (S.settings.checklist && S.settings.checklist.enabled) ? "Hide checklist on chart" : "Show checklist on chart", icon: I.check, run: () => { const c = MSK_CHECK.normalize(S.settings.checklist); c.enabled = !c.enabled; api.settings({ checklist: c }); toast(c.enabled ? "Checklist is on your chart" : "Checklist hidden"); } },
       { g: "Actions", label: "Launch / restart TradingView", icon: I.play, run: () => launchTV((S.tv || {}).status === "no-hook") },
       ...(isExt() ? [] : [{ g: "Actions", label: "Kill all TradingView processes", icon: I.trash, run: () => killAll() }]),
       { g: "Actions", label: "Restart MSK", icon: I.refresh, run: () => api.app.restart() },
@@ -1062,6 +1281,8 @@
   function renderChrome() {
     document.documentElement.dataset.theme = S.settings.theme;
     applyAppearance();
+    const vis = "vis-" + (S.settings.visual || "balanced");
+    if (!document.body.classList.contains(vis)) { document.body.classList.remove("vis-full", "vis-balanced", "vis-light"); document.body.classList.add(vis); }
     const up = $("#upd-pill");
     if (up) { up.hidden = !S.update; if (S.update) $("#upd-text").textContent = `Update v${S.update.version}`; }
     const lb = $('#nav button[data-page="logs"]'), showLogs = S.settings.showLogs !== false;
@@ -1094,6 +1315,10 @@
     $("#upd-pill").onclick = () => go("home");
     window.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); palette(); } });
     $("#theme-btn").onclick = () => api.settings({ theme: S.settings.theme === "dark" ? "light" : "dark" });
+    // while a slider is held, freeze the ambient glow so the glass panels don't have to re-blur every frame
+    document.addEventListener("pointerdown", (e) => { if (e.target.matches && e.target.matches('input[type="range"], .bez-ed')) document.body.classList.add("dragging"); }, true);
+    const undrag = () => document.body.classList.remove("dragging");
+    document.addEventListener("pointerup", undrag, true); document.addEventListener("pointercancel", undrag, true);
     $("#w-min").onclick = api.win.min; $("#w-max").onclick = api.win.max; $("#w-close").onclick = api.win.close;
     $("#tv-pill").onclick = () => { const st = (S.tv || {}).status; if (st === "offline" || st === "no-hook") launchTV(st === "no-hook"); else go("home"); };
     api.onState((s) => {

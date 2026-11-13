@@ -24,8 +24,10 @@ const DEFAULT_SETTINGS = {
   showLogs: true,
   autoUpdate: true,
   fxFps: 11,
+  bgFps: 30,
+  visual: "balanced",
   rotation: { enabled: false, minutes: 15 },
-  hotkeys: { toggle: "CommandOrControl+Alt+B", next: "CommandOrControl+Alt+N", fx: "CommandOrControl+Alt+F" },
+  hotkeys: { toggle: "CommandOrControl+Alt+B", next: "CommandOrControl+Alt+N", fx: "CommandOrControl+Alt+F", check: "CommandOrControl+Alt+C" },
   firstRun: true,
 };
 

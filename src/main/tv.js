@@ -155,9 +155,10 @@ class TVConnector extends EventEmitter {
       let charts = 0, colors = "";
       for (const [, t] of this.targets) {
         try {
-          const r = await t.cdp.send("Runtime.evaluate", { expression: "window.__MSK && { status: window.__MSK.status, logs: window.__MSK.drain ? window.__MSK.drain() : [] }", returnByValue: true });
+          const r = await t.cdp.send("Runtime.evaluate", { expression: "window.__MSK && { status: window.__MSK.status, logs: window.__MSK.drain ? window.__MSK.drain() : [], events: window.__MSK.drainEvents ? window.__MSK.drainEvents() : [] }", returnByValue: true });
           const v = r && r.result && r.result.value, st = v && v.status;
           if (v && v.logs) for (const l of v.logs) LOG.write(l.level || "info", "page", l.msg, l.data);
+          if (v && v.events) for (const ev of v.events) this.emit("page-event", ev);
           if (!st) { this.push(t); continue; }
           charts += st.charts || 0; colors = st.colors || colors;
           if (st.mediaError && !t.reloaded) { t.reloaded = true; log.warn("Media blocked in page, reloading the chart once"); t.cdp.send("Page.reload", { ignoreCache: false }).catch(() => {}); }
@@ -177,7 +178,11 @@ class TVConnector extends EventEmitter {
     try {
       await cdp.ready;
       cdp.on("Fetch.requestPaused", (p) => this.serveMedia(cdp, p));
-      cdp.on("Page.loadEventFired", () => setTimeout(() => this.push(rec), 300));
+      // bindings don't survive a reload without the Runtime domain, so add it back on every load
+      cdp.on("Page.loadEventFired", () => { cdp.send("Runtime.addBinding", { name: "__mskEmit" }).catch(() => {}); setTimeout(() => this.push(rec), 300); });
+      // the page calls window.__mskEmit(json) for things you do on the chart (checklist ticks)
+      cdp.on("Runtime.bindingCalled", (p) => { if (p.name !== "__mskEmit") return; try { this.emit("page-event", JSON.parse(p.payload)); } catch {} });
+      await cdp.send("Runtime.addBinding", { name: "__mskEmit" }).catch(() => {});
       await cdp.send("Page.enable");
       await cdp.send("Network.enable").catch(() => {});
       await cdp.send("Network.setBypassServiceWorker", { bypass: true }).catch(() => {});
@@ -191,6 +196,14 @@ class TVConnector extends EventEmitter {
   }
 
   async push(rec) {
+    // one push in flight per window; rapid changes (dragging a slider) collapse into the latest
+    if (rec.pushing) { rec.again = true; return; }
+    rec.pushing = true;
+    try { await this.pushNow(rec); } finally { rec.pushing = false; }
+    if (rec.again) { rec.again = false; return this.push(rec); }
+  }
+
+  async pushNow(rec) {
     const payload = this.getPayload();
     const expr = `window.__MSK ? window.__MSK.apply(${JSON.stringify(payload)}) : null`;
     try {

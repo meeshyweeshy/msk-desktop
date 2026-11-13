@@ -1,27 +1,30 @@
 // Background layer shown inside TradingView (extension page in an iframe, so it can read media from IndexedDB).
 (() => {
   const W = document.getElementById("w"), T = document.getElementById("t"), V = document.getElementById("v");
-  let key = null, el = null, url = null, raf = null, base = null;
+  let key = null, el = null, url = null, raf = null, base = null, lastFrame = 0;
+  // write a style only when it changed (keeps the GPU idle between animation steps)
+  const S = (e, k, v) => { const c = e.__c || (e.__c = {}); v = String(v); if (c[k] !== v) { c[k] = v; e.style[k] = v; } };
+  const r3 = (n) => Math.round(n * 1000) / 1000;
   function look(c) {
     const bg = c.bg, behind = bg.mode === "behind";
-    document.body.style.opacity = behind ? 1 : bg.opacity;
+    S(document.body, "opacity", behind ? 1 : r3(bg.opacity));
     if (el) {
       const z = Math.max(bg.blur > 0 ? 1.06 : 1, bg.zoom || 1);
-      el.style.objectFit = bg.fit === "stretch" ? "fill" : bg.fit;
-      el.style.objectPosition = bg.position || "center";
-      el.style.filter = `blur(${bg.blur}px) brightness(${bg.brightness}) saturate(${bg.saturation})${bg.hue ? ` hue-rotate(${bg.hue}deg)` : ""}`;
-      el.style.transform = z > 1 ? `scale(${z})` : "none";
-      el.style.opacity = behind ? bg.opacity : 1;
-      if (el.tagName === "VIDEO") el.playbackRate = bg.speed || 1;
+      S(el, "objectFit", bg.fit === "stretch" ? "fill" : bg.fit);
+      S(el, "objectPosition", bg.position || "center");
+      S(el, "filter", `blur(${r3(bg.blur)}px) brightness(${r3(bg.brightness)}) saturate(${r3(bg.saturation)})${bg.hue ? ` hue-rotate(${Math.round(bg.hue)}deg)` : ""}`);
+      S(el, "transform", z > 1 ? `scale(${r3(z)})` : "none");
+      S(el, "opacity", behind ? r3(bg.opacity) : 1);
+      if (el.tagName === "VIDEO" && el.playbackRate !== (bg.speed || 1)) el.playbackRate = bg.speed || 1;
     }
-    T.style.background = bg.tint || "#000"; T.style.opacity = bg.tintStrength || 0;
-    V.style.background = bg.vignette > 0 ? `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${bg.vignette}) 100%)` : "none";
+    S(T, "background", bg.tint || "#000"); S(T, "opacity", r3(bg.tintStrength || 0));
+    S(V, "background", bg.vignette > 0 ? `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,${r3(bg.vignette)}) 100%)` : "none");
   }
   function tick(now) {
     raf = null;
     if (!base || !base.on || !base.cfg) return;
     if (!MSK_FX.active(base.cfg).any) { look(base.cfg); return; }
-    look(MSK_FX.apply(base.cfg, now / 1000));
+    if (now - lastFrame >= (base.frameMs || 33)) { lastFrame = now; look(MSK_FX.apply(base.cfg, now / 1000)); }
     raf = requestAnimationFrame(tick);
   }
   async function refresh() {
@@ -47,7 +50,12 @@
     look(p.cfg);
     if (!raf && MSK_FX.active(p.cfg).any) raf = requestAnimationFrame(tick);
   }
-  chrome.storage.onChanged.addListener((_c, area) => { if (area === "local") refresh(); });
+  const KEYS = ["enabled", "configs", "activeConfigId", "preview", "fxPaused", "media", "settings"];
+  let pend = null;
+  chrome.storage.onChanged.addListener((c, area) => {
+    if (area !== "local" || !KEYS.some((k) => k in c) || pend) return;
+    pend = setTimeout(() => { pend = null; refresh(); }, 24);
+  });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { if (el && el.play) el.play().catch(() => {}); if (!raf && base && base.cfg && MSK_FX.active(base.cfg).any) raf = requestAnimationFrame(tick); } });
   refresh();
 })();

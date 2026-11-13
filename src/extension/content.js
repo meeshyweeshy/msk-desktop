@@ -26,7 +26,22 @@
     } catch (e) { /* extension reloaded or storage unavailable */ }
   }
   document.addEventListener("msk:ready", () => { if (last) send(last); });
-  chrome.storage.onChanged.addListener((_c, area) => { if (area === "local") update(); });
+  // things you do on the chart (checklist ticks, collapse, drag) come back from the page
+  document.addEventListener("msk:event", async (e) => {
+    try {
+      const ev = JSON.parse(e.detail);
+      if (ev.type !== "checklist" || !self.MSK_CHECK) return;
+      const d = await MSKX.load();
+      await chrome.storage.local.set({ settings: { ...d.settings, checklist: MSK_CHECK.applyEvent(d.settings.checklist, ev) } });
+    } catch {}
+  });
+  // only react to keys that change what's on the chart, and fold bursts (slider drags) into one update
+  const KEYS = ["enabled", "configs", "activeConfigId", "preview", "fxPaused", "settings", "media"];
+  let pend = null;
+  chrome.storage.onChanged.addListener((c, area) => {
+    if (area !== "local" || !KEYS.some((k) => k in c) || pend) return;
+    pend = setTimeout(() => { pend = null; update(); }, 24);
+  });
   update();
   setInterval(() => { if (last && JSON.parse(last).on && (!frame || !frame.isConnected)) update(); }, 2000);
 })();

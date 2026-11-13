@@ -35,7 +35,7 @@
   }
   async function commandKeys() {
     const out = {};
-    try { for (const c of await chrome.commands.getAll()) { const k = { "toggle-bg": "toggle", "next-config": "next", "toggle-fx": "fx" }[c.name]; if (k) out[k] = c.shortcut || ""; } } catch {}
+    try { for (const c of await chrome.commands.getAll()) { const k = { "toggle-bg": "toggle", "next-config": "next", "toggle-fx": "fx", "toggle-checklist": "check" }[c.name]; if (k) out[k] = c.shortcut || ""; } } catch {}
     return out;
   }
   let tvLast = "";

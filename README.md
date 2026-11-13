@@ -5,7 +5,7 @@
 <p align="center">
   <a href="../../releases/latest"><img alt="download for windows" src="https://img.shields.io/badge/download-windows-39C5BB?style=for-the-badge&labelColor=0b1416&logo=windows&logoColor=white" /></a>
   <a href="../../releases/latest"><img alt="download for macos" src="https://img.shields.io/badge/download-macos-39C5BB?style=for-the-badge&labelColor=0b1416&logo=apple&logoColor=white" /></a>
-  <img alt="version" src="https://img.shields.io/badge/version-1.4.0-39C5BB?style=for-the-badge&labelColor=0b1416" />
+  <img alt="version" src="https://img.shields.io/badge/version-1.5.0-39C5BB?style=for-the-badge&labelColor=0b1416" />
   <img alt="electron" src="https://img.shields.io/badge/built%20with-electron-39C5BB?style=for-the-badge&labelColor=0b1416" />
   <img alt="price" src="https://img.shields.io/badge/price-free-white?style=for-the-badge&labelColor=0b1416" />
 </p>
@@ -42,6 +42,8 @@
 | 🎨 **Base color** | Solid, gradient or TradingView's own theme behind your media. Or no media, just color. |
 | 🕯️ **Candle colors** | Bodies, borders, wicks, grid, scale text, crosshair. Color palettes included. |
 | ✨ **Animations** | Pulse, flash, strobe, heartbeat, flicker, rainbow cycling, on basically anything. |
+| 〰️ **Curves** | Shape every animation with presets (Smooth, Snap, Overshoot…) or drag your own curve. |
+| 📋 **Trading checklist** | A pre-trade checklist right on your chart. Tick items there or in MSK, get a score (points, percent or grade) and a Ready / Wait call against your minimum. |
 | 🗂️ **Configs** | Starts with a clean Monochrome look. Save your own, one-click switching, auto-rotate, export/import `.msk` (media included). |
 | 🌈 **Your colors** | Pick MSK's own accent, glow and background colors in **Settings → Appearance**. |
 | 🧰 **Quality of life** | Tray / menu bar icon, launch at login, global hotkeys, `Ctrl+K` / `⌘K` command palette, light/dark theme. |
@@ -56,9 +58,15 @@
     <td width="50%"><img src="docs/app-configs.jpg" alt="Configs" /><p align="center"><b>Configs</b>: all your looks in one place</p></td>
   </tr>
   <tr>
+    <td width="50%"><img src="docs/app-checklist.jpg" alt="Checklist" /><p align="center"><b>Checklist</b>: your pre-trade rules with a score</p></td>
+    <td width="50%"><img src="docs/app-curves.jpg" alt="Animation curves" /><p align="center"><b>Curves</b>: drag the dots to shape an animation</p></td>
+  </tr>
+  <tr>
     <td colspan="2"><img src="docs/app-settings.jpg" alt="Settings" /><p align="center"><b>Settings</b>: your own app colors, TradingView status, hotkeys, debug</p></td>
   </tr>
 </table>
+
+<p align="center"><img src="docs/app-checklist-chart.jpg" alt="Checklist on the chart" width="88%" /><br /><sub>The trading checklist on your chart: tick items, watch the score, drag it anywhere</sub></p>
 
 ## ✦ Install
 
@@ -102,6 +110,7 @@ Heads up: while that port is open, other programs on your computer could control
 | `Ctrl` `Alt` `B` | `⌘` `⌥` `B` | Background on / off |
 | `Ctrl` `Alt` `N` | `⌘` `⌥` `N` | Next config |
 | `Ctrl` `Alt` `F` | `⌘` `⌥` `F` | Pause / resume animations |
+| `Ctrl` `Alt` `C` | `⌘` `⌥` `C` | Show / hide the checklist |
 | `Ctrl` `K` | `⌘` `K` | Command palette (inside MSK) |
 
 All changeable in **Settings → Hotkeys**.

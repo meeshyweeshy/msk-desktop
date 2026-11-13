@@ -1,7 +1,7 @@
 {
   "name": "msk",
   "productName": "MSK",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "MSK - custom backgrounds and chart colors for TradingView Desktop (Windows & macOS)",
   "author": "meeshy",
   "main": "src/main/main.js",

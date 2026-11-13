@@ -21,6 +21,7 @@ let win, tray, tv, data, preview = null, quitting = false, lastRotate = Date.now
 const UPDATE_REPO = "meeshyweeshy/msk-desktop";
 const ROOT = path.join(__dirname, "..", "..");
 const ICON = path.join(ROOT, "build", "icon.png");
+const CHECK = require("../renderer/checklist.js");
 const IS_MAC = process.platform === "darwin";
 const startHidden = process.argv.includes("--hidden") || process.argv.includes("--launch-tv") || (IS_MAC && (() => { try { return app.getLoginItemSettings().wasOpenedAtLogin; } catch { return false; } })());
 
@@ -31,7 +32,9 @@ function payload() {
   let cfg = preview || store.activeConfig();
   if (cfg && data.fxPaused) cfg = { ...cfg, fxOn: false };
   const m = cfg && cfg.bg.mediaId && findMedia(cfg.bg.mediaId);
-  return { on: !!data.enabled, fxMs: Math.round(1000 / (data.settings.fxFps || 11)), cfg, media: m ? { id: m.id, type: m.type, rev: m.rev || 0 } : null };
+  const s = data.settings;
+  return { on: !!data.enabled, fxMs: Math.round(1000 / (s.fxFps || 11)), frameMs: Math.round(1000 / (s.bgFps || 30)), cfg, media: m ? { id: m.id, type: m.type, rev: m.rev || 0 } : null,
+    checklist: { ...CHECK.normalize(s.checklist), accent: (s.appearance && s.appearance.accent) || "#39C5BB" } };
 }
 function fullState() {
   return { settings: data.settings, media: data.media, configs: data.configs, activeConfigId: data.activeConfigId,
@@ -165,6 +168,7 @@ function registerHotkeys() {
   reg(hk.toggle, () => setEnabled(!data.enabled));
   reg(hk.next, () => nextConfig());
   reg(hk.fx, () => setFxPaused(!data.fxPaused));
+  reg(hk.check, () => { const c = CHECK.normalize(data.settings.checklist); c.enabled = !c.enabled; data.settings.checklist = c; changed(); });
 }
 setInterval(() => {
   const r = data && data.settings.rotation;
@@ -387,6 +391,12 @@ app.whenReady().then(async () => {
   registerIPC();
   tv = new TVConnector({ getPayload: payload, getMediaFile: (id) => { const m = findMedia(id); return m ? store.mediaPath(m) : null; }, getSettings: () => data.settings });
   tv.on("state", () => changed({ push: false }));
+  tv.on("page-event", (ev) => {
+    if (!ev || ev.type !== "checklist") return;
+    data.settings.checklist = CHECK.applyEvent(data.settings.checklist, ev);
+    log.debug("Checklist from chart", { checked: data.settings.checklist.checked.length, collapsed: data.settings.checklist.collapsed });
+    changed();
+  });
   let pend = [], lt = null;
   LOG.bus.on("line", (e) => { pend.push(e); if (!lt) lt = setTimeout(() => { lt = null; const b = pend; pend = []; win && !win.isDestroyed() && win.webContents.send("logs", b); }, 120); });
   log.info(`MSK ${app.getVersion()}${DEBUG ? " (debug)" : ""}`, { exe: process.execPath, data: store.dir, electron: process.versions.electron });
@@ -434,6 +444,7 @@ function devShots() {
     win.show();
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     await wait(+(process.env.MSK_SHOT_WAIT || 2500));
+    if (process.env.MSK_EVAL) { try { console.log("[eval]", JSON.stringify(await win.webContents.executeJavaScript(fs.readFileSync(process.env.MSK_EVAL, "utf8")))); } catch (e) { console.log("[eval] error", e.message); } try { fs.writeFileSync(path.join(out, "eval.png"), (await win.webContents.capturePage()).toPNG()); } catch {} quitting = true; app.exit(0); return; }
     for (const p of (process.env.MSK_PAGES || "home,library,editor,configs,settings").split(",")) {
       if (p === "logs") await tv.diagnose(store.dir);
       if (p === "palette") { await win.webContents.executeJavaScript(`document.getElementById('pal-btn').click(); setTimeout(()=>{const i=document.querySelector('.cmdk input'); i.value='mi'; i.dispatchEvent(new Event('input'))},300)`); await wait(1200); }
