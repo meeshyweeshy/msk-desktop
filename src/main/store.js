@@ -60,20 +60,7 @@ function baseConfig(name, chart, bg = {}) {
 
 function presets() {
   return [
-    baseConfig("MSK Mono", {}),
-    baseConfig("Miku", {
-      up: "#39C5BB", down: "#FFFFFF", borderUp: "#39C5BB", borderDown: "#FFFFFF",
-      wickUp: "#39C5BB", wickDown: "#FFFFFF", crosshair: "#7CF7EE", text: "#BFF7F2",
-    }, { tint: "#062a2a", tintStrength: 0.35 }),
-    baseConfig("Classic", {
-      up: "#089981", down: "#F23645", borderUp: "#089981", borderDown: "#F23645",
-      wickUp: "#089981", wickDown: "#F23645", crosshair: "#9598A1", text: "#B2B5BE",
-      grid: true, gridColor: "#FFFFFF10",
-    }),
-    baseConfig("Neon Night", {
-      up: "#00F5D4", down: "#FF2E88", borderUp: "#00F5D4", borderDown: "#FF2E88",
-      wickUp: "#00F5D4", wickDown: "#FF2E88", crosshair: "#FFFFFF", text: "#E0E0FF",
-    }, { tint: "#14002b", tintStrength: 0.4 }),
+    baseConfig("Monochrome", {}),
   ].map((c) => ({ ...c, builtIn: true }));
 }
 
@@ -88,6 +75,10 @@ function load() {
     rotation: { ...DEFAULT_SETTINGS.rotation, ...(data.settings?.rotation || {}) },
     hotkeys: { ...DEFAULT_SETTINGS.hotkeys, ...(data.settings?.hotkeys || {}) } };
   data.media ||= []; data.configs ||= [];
+  // 1.4: Monochrome is the only built-in look. Drop the old untouched presets (your own copies stay).
+  data.configs = data.configs.filter((c) => !c.builtIn || ["MSK Mono", "Monochrome"].includes(c.name));
+  data.configs.forEach((c) => { if (c.builtIn && c.name === "MSK Mono") c.name = "Monochrome"; });
+  if (!data.configs.length) data.configs = presets();
   if (!data.configs.find((c) => c.id === data.activeConfigId)) data.activeConfigId = data.configs[0]?.id || null;
   saveNow();
   return data;

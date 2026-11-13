@@ -46,9 +46,9 @@ const manifest = {
   ],
   web_accessible_resources: [{ resources: ["layer.html", "layer.js", "common.js", "studio/fx.js"], matches: test ? ["https://*.tradingview.com/*", "http://localhost/*"] : ["https://*.tradingview.com/*"] }],
   commands: {
-    "toggle-bg": { suggested_key: { default: "Alt+Shift+B" }, description: "Turn background on/off" },
-    "next-config": { suggested_key: { default: "Alt+Shift+N" }, description: "Next config" },
-    "toggle-fx": { suggested_key: { default: "Alt+Shift+F" }, description: "Pause/resume animations" },
+    "toggle-bg": { suggested_key: { default: "Alt+Shift+M" }, description: "Turn background on/off" },
+    "next-config": { suggested_key: { default: "Alt+Shift+Period" }, description: "Next config" },
+    "toggle-fx": { suggested_key: { default: "Alt+Shift+Comma" }, description: "Pause/resume animations" },
   },
 };
 fs.writeFileSync(path.join(out, "manifest.json"), JSON.stringify(manifest, null, 2));

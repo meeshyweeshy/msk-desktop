@@ -64,7 +64,7 @@ Trading futures, stocks, options, crypto, forex or anything else carries a real 
 - I give you a free, personal, non-exclusive, revocable license to download, install and use MSK, and to read and change the source code for your own personal use.
 - Without my written permission, you may not sell MSK, redistribute it (changed or unchanged) under the MSK name or as your own, or remove these terms or copyright notices.
 - If a repository later includes a `LICENSE` file, that file controls how the code in that repository may be used.
-- Third-party parts keep their own licenses: Electron (MIT) and Chromium (license files ship with the app), ws (MIT), and the Unbounded and Manrope fonts (SIL Open Font License 1.1, included in the `fonts` folder).
+- Third-party parts keep their own licenses: Electron (MIT) and Chromium (license files ship with the app), ws (MIT), and the Sora and Manrope fonts (SIL Open Font License 1.1, included in the `fonts` folder).
 
 ## 8. No warranty
 

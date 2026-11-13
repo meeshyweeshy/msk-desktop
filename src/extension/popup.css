@@ -1,23 +1,23 @@
-@font-face { font-family: "Unbounded"; src: url(studio/fonts/unbounded-latin-900-normal.woff2) format("woff2"); font-weight: 900; }
+@font-face { font-family: "Sora"; src: url(studio/fonts/sora-latin-800-normal.woff2) format("woff2"); font-weight: 800 900; }
 @font-face { font-family: "Manrope"; src: url(studio/fonts/manrope-latin-700-normal.woff2) format("woff2"); font-weight: 700; }
 @font-face { font-family: "Manrope"; src: url(studio/fonts/manrope-latin-800-normal.woff2) format("woff2"); font-weight: 800; }
-:root { --miku: #39c5bb; --spring: cubic-bezier(.34,1.56,.64,1); }
+:root { --acc: 57,197,187; --glow: 57,197,187; --miku: rgb(var(--acc)); --on-acc: #001a18; --spring: cubic-bezier(.34,1.56,.64,1); }
 [data-theme="dark"] { --bg: #000; --fg: #fff; --fg2: rgba(255,255,255,.6); --fg3: rgba(255,255,255,.38); --line: rgba(255,255,255,.1); --field: rgba(255,255,255,.06); --solid: #fff; --on: #000; }
 [data-theme="light"] { --bg: #f3f4f5; --fg: #050505; --fg2: rgba(0,0,0,.6); --fg3: rgba(0,0,0,.38); --line: rgba(0,0,0,.09); --field: rgba(0,0,0,.05); --solid: #000; --on: #fff; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { width: 340px; padding: 14px; font: 700 13px Manrope, "Segoe UI", sans-serif; color: var(--fg);
-  background: radial-gradient(120% 70% at 100% 0%, rgba(57,197,187,.22), transparent 60%), radial-gradient(90% 60% at 0% 100%, rgba(255,255,255,.08), transparent 60%), var(--bg); }
+  background: radial-gradient(120% 70% at 100% 0%, rgba(var(--glow),.22), transparent 60%), radial-gradient(90% 60% at 0% 100%, rgba(255,255,255,.08), transparent 60%), var(--bg); }
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
 header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .brand { display: flex; align-items: center; gap: 8px; }
 #wm { width: 78px; color: var(--fg); }
 #wm svg { display: block; width: 100%; height: auto; }
-.tag { font: 900 11px Unbounded, sans-serif; letter-spacing: .22em; color: var(--fg3); }
+.tag { font: 900 11px Sora, sans-serif; letter-spacing: .22em; color: var(--fg3); }
 .np { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 18px; background: var(--field); border: 1px solid var(--line); margin-bottom: 10px; animation: rise .5s both; }
 .np .thumb { width: 52px; height: 52px; border-radius: 13px; background: #111 center/cover; border: 1px solid var(--line); flex: none; }
 .np .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .np small { font-size: 9px; letter-spacing: .14em; color: var(--fg3); }
-.np b { font: 900 16px Unbounded, sans-serif; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np b { font: 900 16px Sora, sans-serif; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np span { font-size: 11px; color: var(--fg3); }
 .icon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; color: var(--fg2); transition: background .2s, transform .3s var(--spring); }
 .icon:hover { background: var(--line); color: var(--fg); } .icon:active { transform: scale(.9); }
@@ -47,7 +47,8 @@ footer { display: flex; gap: 8px; margin-top: 12px; }
 .switch input:checked + span::after { transform: translateX(18px); }
 .switch.big input:checked + span::after { transform: translateX(22px); }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-.upd { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; margin-bottom: 10px; border-radius: 14px; background: var(--miku); color: #001a18; cursor: pointer; text-decoration: none; animation: rise .5s both, pulse 2.4s ease-in-out infinite; }
+.upd { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; margin-bottom: 10px; border-radius: 14px; background: var(--miku); color: var(--on-acc); cursor: pointer; text-decoration: none; animation: rise .5s both, pulse 2.4s ease-in-out infinite; }
 .upd[hidden] { display: none; }
 .upd b { font-weight: 800; } .upd span { font-size: 11px; opacity: .75; }
-@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(57,197,187,.18); } }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(var(--acc),.18); } }
+svg .sh rect { fill: var(--miku); }

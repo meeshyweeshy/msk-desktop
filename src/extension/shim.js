@@ -180,8 +180,7 @@
       await save({ settings: s, ...(patch.rotation ? { lastRotate: Date.now() } : {}) });
       return s;
     },
-    logs: { get: async () => ({ lines: [], verbose: false, file: "", debug: false, watching: false }), clear: async () => true, open: async () => {}, verbose: async () => {}, ui: async (l, m, d) => console.warn("[MSK]", m, d || ""), on: () => {} },
-    watch: async () => false,
+    logs: { get: async () => ({ lines: [], verbose: false, file: "", debug: false }), clear: async () => true, open: async () => {}, verbose: async () => {}, ui: async (l, m, d) => console.warn("[MSK]", m, d || ""), on: () => {} },
     tv: {
       launch: async () => { await chrome.tabs.create({ url: "https://www.tradingview.com/chart/" }); return { ok: true, message: "Opened a TradingView chart" }; },
       detect: async () => null, browse: async () => null, resetCopy: async () => true,

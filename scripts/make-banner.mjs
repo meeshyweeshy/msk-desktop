@@ -33,7 +33,7 @@ function candles(W, H, n, seed, anim) {
   }
   return `<g opacity="${anim ? 0.22 : 0.18}">${out}</g>`;
 }
-function banner({ W, H, px, animated, sub = true, subtitle = "TRADINGVIEW CHART SKINS" }) {
+function banner({ W, H, px, animated, sub = true, subtitle = "BACKGROUNDS &amp; COLORS FOR TRADINGVIEW" }) {
   const tw = (cols + 1) * px, th = (rows + 1) * px;
   const ox = Math.round((W - tw) / 2), oy = Math.round(H * (sub ? 0.43 : 0.5) - th / 2);
   const css = animated ? `<style>
@@ -71,8 +71,8 @@ function banner({ W, H, px, animated, sub = true, subtitle = "TRADINGVIEW CHART 
 
 fs.mkdirSync("docs", { recursive: true });
 fs.writeFileSync("docs/banner.svg", banner({ W: 1280, H: 380, px: 14, animated: true }));
-fs.writeFileSync("docs/banner-desktop.svg", banner({ W: 1280, H: 380, px: 14, animated: true, subtitle: "CHART SKINS FOR TRADINGVIEW DESKTOP" }));
-fs.writeFileSync("docs/social-preview-desktop.png", new Resvg(banner({ W: 1280, H: 640, px: 18, animated: false, subtitle: "CHART SKINS FOR TRADINGVIEW DESKTOP" }), { fitTo: { mode: "width", value: 1280 }, font: { loadSystemFonts: true } }).render().asPng());
+fs.writeFileSync("docs/banner-desktop.svg", banner({ W: 1280, H: 380, px: 14, animated: true, subtitle: "BACKGROUNDS &amp; COLORS FOR TRADINGVIEW DESKTOP" }));
+fs.writeFileSync("docs/social-preview-desktop.png", new Resvg(banner({ W: 1280, H: 640, px: 18, animated: false, subtitle: "BACKGROUNDS &amp; COLORS FOR TRADINGVIEW DESKTOP" }), { fitTo: { mode: "width", value: 1280 }, font: { loadSystemFonts: true } }).render().asPng());
 const social = banner({ W: 1280, H: 640, px: 18, animated: false });
 fs.writeFileSync("docs/social-preview.png", new Resvg(social, { fitTo: { mode: "width", value: 1280 }, font: { loadSystemFonts: true } }).render().asPng());
 fs.writeFileSync("docs/banner-preview.png", new Resvg(banner({ W: 1280, H: 380, px: 14, animated: false }), { fitTo: { mode: "width", value: 1280 }, font: { loadSystemFonts: true } }).render().asPng());

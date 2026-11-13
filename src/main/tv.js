@@ -535,7 +535,7 @@ public static class MskActivate {
     log.info("Launch requested", { restart, found: tv });
     if (!tv) { log.error("TradingView not found"); return { ok: false, message: "Couldn't find TradingView. Install it from tradingview.com/desktop or set the path in Settings." }; }
     if (this.isRunning()) {
-      if (!restart) return { ok: false, needsRestart: true, message: "TradingView is open without MSK. Restart it from MSK." };
+      if (!restart) return { ok: false, needsRestart: true, message: "MSK isn't connected to the running TradingView. Relaunch it from MSK." };
       this.killTV(); await new Promise((r) => setTimeout(r, 1500));
     }
     this.busy = true; this.launching = true; this.setState({ status: "launching", message: "Starting TradingView..." });

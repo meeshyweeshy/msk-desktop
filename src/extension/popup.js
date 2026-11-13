@@ -1,4 +1,15 @@
 (async () => {
+  // custom UI colors (same settings as the Studio's Appearance section)
+  function paint(a) {
+    a = a || {}; const st = document.documentElement.style;
+    const rgb = (h) => { h = String(h || "").replace("#", ""); return /^[0-9a-f]{6}$/i.test(h) ? [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) : null; };
+    const acc = rgb(a.accent) || [57, 197, 187], glow = rgb(a.glow) || acc;
+    st.setProperty("--acc", acc.join(",")); st.setProperty("--glow", glow.join(",")); st.setProperty("--miku", `rgb(${acc.join(",")})`);
+    const L = acc.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s2, v, i) => s2 + v * [0.2126, 0.7152, 0.0722][i], 0);
+    st.setProperty("--on-acc", L > 0.32 ? "#05110f" : "#ffffff");
+    const bg = document.documentElement.dataset.theme === "light" ? a.bgLight : a.bgDark;
+    if (bg && rgb(bg)) st.setProperty("--bg", bg); else st.removeProperty("--bg");
+  }
   const $ = (s) => document.querySelector(s);
   $("#wm").innerHTML = window.MSK_WORDMARK || "";
   const thumbs = {};
@@ -12,6 +23,7 @@
   async function render() {
     const d = await MSKX.load();
     document.documentElement.dataset.theme = d.settings.theme || "dark";
+    paint(d.settings.appearance);
     $("#on").checked = !!d.enabled; $("#fx").checked = !d.fxPaused;
     $("#upd").hidden = !d.update; if (d.update) { $("#upd-v").textContent = "v" + d.update.version; $("#upd").onclick = () => chrome.tabs.create({ url: d.update.zip }); }
     const c = MSKX.activeConfig(d), media = (id) => d.media.find((m) => m.id === id);

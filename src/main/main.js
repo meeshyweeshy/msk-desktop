@@ -16,7 +16,6 @@ const log = LOG.scoped("app");
 process.on("uncaughtException", (e) => log.error("Uncaught exception", e));
 process.on("unhandledRejection", (e) => log.error("Unhandled rejection", e instanceof Error ? e : String(e)));
 const { TVConnector, mimeOf } = require("./tv");
-const watcher = require("./watch");
 
 let win, tray, tv, data, preview = null, quitting = false, lastRotate = Date.now(), updateInfo = null;
 const UPDATE_REPO = "meeshyweeshy/msk-desktop";
@@ -83,7 +82,7 @@ function buildTray() {
     tray.on("click", () => showWindow());
   }
   const st = tv ? tv.state.status : "offline";
-  const label = { connected: "TradingView: hooked", "no-hook": "TradingView: open without MSK", launching: "TradingView: launching...", waiting: "TradingView: loading..." }[st] || "TradingView: closed";
+  const label = { connected: "TradingView: hooked", "no-hook": "TradingView: not connected", launching: "TradingView: launching...", waiting: "TradingView: loading..." }[st] || "TradingView: closed";
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open MSK", click: () => showWindow() },
     ...(updateInfo ? [{ label: `⬆  Update to v${updateInfo.version}`, click: () => openUpdate() }] : []),
@@ -324,7 +323,7 @@ function registerIPC() {
   h("update:open", (kind) => openUpdate(kind));
   h("update:dismiss", (v) => { data.dismissedUpdate = v; changed({ push: false }); });
   h("app:openUrl", (u) => { if (/^https:\/\/github\.com\//.test(u)) shell.openExternal(u); });
-  h("logs:get", () => ({ lines: LOG.all(), verbose: LOG.isVerbose(), file: LOG.file(), debug: DEBUG, watching: watcher.running() }));
+  h("logs:get", () => ({ lines: LOG.all(), verbose: LOG.isVerbose(), file: LOG.file(), debug: DEBUG }));
   h("logs:clear", () => { LOG.clear(); return true; });
   h("logs:open", () => shell.showItemInFolder(LOG.file()));
   h("logs:verbose", (v) => LOG.setVerbose(v));
@@ -332,7 +331,6 @@ function registerIPC() {
   h("tv:kill", () => tv.killAll());
   h("tv:diagnose", () => tv.diagnose(store.dir));
   h("tv:test", () => tv.hookTest(store.dir));
-  h("watch:set", (on) => (on ? watcher.start() : watcher.stop()));
   h("app:devtools", () => win.webContents.openDevTools({ mode: "detach" }));
   h("app:reset", async () => {
     const r = await dialog.showMessageBox(win, { type: "warning", buttons: ["Cancel", "Reset everything"], defaultId: 0, cancelId: 0,
@@ -356,7 +354,7 @@ app.on("second-instance", (_e, argv) => {
 app.on("before-quit", () => { quitting = true; });
 let booted = false;
 app.on("activate", (_e, hasVisible) => { if (booted && !hasVisible) showWindow(); });
-app.on("will-quit", () => { globalShortcut.unregisterAll(); watcher.stop(); });
+app.on("will-quit", () => { globalShortcut.unregisterAll(); });
 app.on("window-all-closed", (e) => { if (!data.settings.closeToTray) app.quit(); });
 
 function macMenu() {
@@ -404,7 +402,7 @@ app.whenReady().then(async () => {
     setTimeout(async () => {
       const r = await tv.launch({ restart: false, dataDir: store.dir });
       if (r.needsRestart && Notification.isSupported()) {
-        const n = new Notification({ title: "MSK", body: "TradingView is open without MSK. Click to restart it with your background.", icon: ICON });
+        const n = new Notification({ title: "MSK", body: "MSK isn't connected to TradingView yet. Click to relaunch it connected.", icon: ICON });
         n.on("click", () => launchTV(true)); n.show();
       }
     }, 1200);
@@ -415,6 +413,7 @@ app.whenReady().then(async () => {
 function devShots() {
   const out = process.env.MSK_SHOT;
   for (const f of (process.env.MSK_TEST_MEDIA || "").split(",").filter(Boolean)) addMediaFile(f);
+  for (const n of ["Demo A", "Demo B", "Demo C"]) if (data.configs.length < 4) data.configs.push({ ...store.baseConfig(n), id: store.uid(), builtIn: false });
   if (data.media[0] && !process.env.MSK_DEMO) { const img = data.media.find((m) => m.type === "image"); data.configs[1].bg.mediaId = (img || data.media[0]).id; data.activeConfigId = data.configs[1].id; }
   if (process.env.MSK_THEME) data.settings.theme = process.env.MSK_THEME;
   if (process.env.MSK_DEMO && data.media.length >= 3) {
@@ -422,7 +421,7 @@ function devShots() {
     const c = data.configs;
     Object.assign(c[1], { name: "Neon City", builtIn: false, fx: [{ id: "d1", on: true, target: "candles", wave: "saw", period: 6, min: 0, max: 360, phase: 0 }, { id: "d2", on: true, target: "brightness", wave: "heartbeat", period: 1.4, min: 75, max: 115, phase: 0 }] });
     Object.assign(c[1].bg, { mediaId: city.id, opacity: 0.9, brightness: 0.9 });
-    Object.assign(c[0], { name: "Night Hills", builtIn: false }); Object.assign(c[0].bg, { mediaId: night.id, base: { mode: "gradient", color: "#0B4A46", color2: "#1A0B2E", angle: 135 } });
+    Object.assign(c[2], { name: "Night Hills", builtIn: false }); Object.assign(c[2].bg, { mediaId: night.id, base: { mode: "gradient", color: "#0B4A46", color2: "#1A0B2E", angle: 135 } });
     Object.assign(c[3], { name: "Teal Wave", builtIn: false }); c[3].bg.mediaId = wave.id;
     data.activeConfigId = c[1].id;
   }
@@ -435,12 +434,12 @@ function devShots() {
     win.show();
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     await wait(+(process.env.MSK_SHOT_WAIT || 2500));
-    for (const p of (process.env.MSK_PAGES || "home,library,workshop,configs,settings").split(",")) {
+    for (const p of (process.env.MSK_PAGES || "home,library,editor,configs,settings").split(",")) {
       if (p === "logs") await tv.diagnose(store.dir);
       if (p === "palette") { await win.webContents.executeJavaScript(`document.getElementById('pal-btn').click(); setTimeout(()=>{const i=document.querySelector('.cmdk input'); i.value='mi'; i.dispatchEvent(new Event('input'))},300)`); await wait(1200); }
       else if (p.startsWith("settings@")) { win.webContents.send("nav", "settings"); await wait(1500); await win.webContents.executeJavaScript(`document.querySelector('[data-sec="${p.split("@")[1]}"]').click()`); await wait(1200); }
       else { win.webContents.send("nav", p); await wait(1800); }
-      if (p === "workshop" && process.env.MSK_SCROLL) { await win.webContents.executeJavaScript(`document.querySelectorAll('.panel').forEach(p=>p.open=true);document.querySelector('#view').scrollTop=${process.env.MSK_SCROLL}`); await wait(900); }
+      if (p === "editor" && process.env.MSK_SCROLL) { await win.webContents.executeJavaScript(`document.querySelectorAll('.panel').forEach(p=>p.open=true);document.querySelector('#view').scrollTop=${process.env.MSK_SCROLL}`); await wait(900); }
       const img = await win.webContents.capturePage();
       fs.writeFileSync(path.join(out, p.replace("@", "-") + ".png"), img.toPNG());
     }

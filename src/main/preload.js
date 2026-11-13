@@ -21,7 +21,6 @@ contextBridge.exposeInMainWorld("msk", {
   logs: { get: inv("logs:get"), clear: inv("logs:clear"), open: inv("logs:open"), verbose: inv("logs:verbose"), ui: inv("logs:ui"), on: (fn) => ipcRenderer.on("logs", (_e, b) => fn(b)) },
   settings: inv("settings:update"),
   tv: { launch: inv("tv:launch"), detect: inv("tv:detect"), browse: inv("tv:browse"), resetCopy: inv("tv:resetCopy"), shortcut: inv("tv:shortcut"), kill: inv("tv:kill"), diagnose: inv("tv:diagnose"), test: inv("tv:test") },
-  watch: inv("watch:set"),
   app: { openData: inv("app:openData"), reset: inv("app:reset"), devtools: inv("app:devtools"), restart: inv("app:restart") },
   win: { min: inv("win:min"), max: inv("win:max"), close: inv("win:close") },
 });

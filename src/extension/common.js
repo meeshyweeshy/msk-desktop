@@ -13,10 +13,7 @@
   }
   function presets() {
     return [
-      baseConfig("MSK Mono"),
-      baseConfig("Miku", { up: "#39C5BB", down: "#FFFFFF", borderUp: "#39C5BB", borderDown: "#FFFFFF", wickUp: "#39C5BB", wickDown: "#FFFFFF", crosshair: "#7CF7EE", text: "#BFF7F2" }, { tint: "#062a2a", tintStrength: 0.35 }),
-      baseConfig("Classic", { up: "#089981", down: "#F23645", borderUp: "#089981", borderDown: "#F23645", wickUp: "#089981", wickDown: "#F23645", crosshair: "#9598A1", text: "#B2B5BE", grid: true, gridColor: "#FFFFFF10" }),
-      baseConfig("Neon Night", { up: "#00F5D4", down: "#FF2E88", borderUp: "#00F5D4", borderDown: "#FF2E88", wickUp: "#00F5D4", wickDown: "#FF2E88", crosshair: "#FFFFFF", text: "#E0E0FF" }, { tint: "#14002b", tintStrength: 0.4 }),
+      baseConfig("Monochrome"),
     ].map((c) => ({ ...c, builtIn: true }));
   }
 
@@ -30,6 +27,14 @@
     }
     d.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}), rotation: { ...DEFAULT_SETTINGS.rotation, ...((d.settings || {}).rotation || {}) } };
     d.media = d.media || [];
+    // 1.4: Monochrome is the only built-in look. Drop the old untouched presets (your own copies stay).
+    const kept = d.configs.filter((c) => !c.builtIn || ["MSK Mono", "Monochrome"].includes(c.name));
+    if (kept.length !== d.configs.length || kept.some((c) => c.builtIn && c.name === "MSK Mono")) {
+      kept.forEach((c) => { if (c.builtIn && c.name === "MSK Mono") c.name = "Monochrome"; });
+      d.configs = kept.length ? kept : presets();
+      if (!d.configs.find((c) => c.id === d.activeConfigId)) d.activeConfigId = d.configs[0].id;
+      await chrome.storage.local.set({ configs: d.configs, activeConfigId: d.activeConfigId });
+    }
     if (!d.configs.find((c) => c.id === d.activeConfigId)) d.activeConfigId = d.configs[0].id;
     return d;
   }

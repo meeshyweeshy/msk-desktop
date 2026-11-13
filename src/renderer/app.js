@@ -33,6 +33,24 @@
   const thumbURL = (m) => (window.MSK_URLS ? window.MSK_URLS.thumb(m) : `msk://thumb/${m.id}?r=${m.thumbRev || 0}`);
   const isExt = () => S && S.platform === "extension";
   const isMac = () => S && S.os === "darwin";
+
+  // ---------- custom UI colors ----------
+  const UI_DEFAULT = { accent: "#39C5BB", glow: "#39C5BB", bgDark: "", bgLight: "" };
+  const UI_PRESETS = [["Miku", "#39C5BB"], ["Ice", "#5AB2FF"], ["Rose", "#FF5C8A"], ["Lime", "#9BE15D"], ["Amber", "#FFB547"], ["Crimson", "#FF4D4D"], ["Lilac", "#B9A2FF"], ["Silver", "#C3CAD1"]];
+  const hexRgb = (h) => { h = String(h || "").replace("#", ""); if (h.length === 3) h = [...h].map((c) => c + c).join(""); const n = parseInt(h.slice(0, 6), 16); return /^[0-9a-f]{6}/i.test(h) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : null; };
+  const lum = (rgb) => rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  function appearance() { return { ...UI_DEFAULT, ...((S && S.settings && S.settings.appearance) || {}) }; }
+  function applyAppearance(a = appearance()) {
+    const st = document.documentElement.style;
+    const acc = hexRgb(a.accent) || hexRgb(UI_DEFAULT.accent), glow = hexRgb(a.glow) || acc;
+    st.setProperty("--acc", acc.join(","));
+    st.setProperty("--glow", glow.join(","));
+    st.setProperty("--miku", `rgb(${acc.join(",")})`);
+    st.setProperty("--miku-2", `rgb(${acc.map((v) => Math.round(v + (255 - v) * 0.45)).join(",")})`);
+    st.setProperty("--on-acc", lum(acc) > 0.32 ? "#05110f" : "#ffffff");
+    const bg = document.documentElement.dataset.theme === "light" ? a.bgLight : a.bgDark;
+    if (bg && hexRgb(bg)) st.setProperty("--bg", bg); else st.removeProperty("--bg");
+  }
   const findMedia = (id) => S.media.find((m) => m.id === id);
   const findCfg = (id) => S.configs.find((c) => c.id === id);
   const activeCfg = () => findCfg(S.activeConfigId) || S.configs[0];
@@ -221,13 +239,13 @@
       : { title: "No chart open", sub: "Open a TradingView chart tab to see MSK", dot: "", btn: ["Open TradingView", false] };
     return {
       connected: { title: "Hooked", sub: `${t.charts || 0} chart${t.charts === 1 ? "" : "s"} · ${COLOR_TEXT[t.colors] || "Applying..."}${t.port && t.port !== S.settings.port ? ` · via port ${t.port}` : ""}`, dot: "on", btn: null },
-      "no-hook": { title: "Not hooked", sub: "TradingView is open without MSK", dot: "warn", btn: ["Restart with MSK", true] },
+      "no-hook": { title: "Not hooked", sub: "TradingView is running but MSK isn't connected", dot: "warn", btn: ["Relaunch & hook", true] },
       launching: { title: "Launching", sub: t.message || "Starting TradingView...", dot: "busy", btn: null },
       waiting: { title: "Loading", sub: "Waiting for a chart window...", dot: "busy", btn: null },
       offline: { title: "Closed", sub: "TradingView isn't running", dot: "", btn: ["Launch TradingView", false] },
     }[t.status || "offline"];
   }
-  async function launchTV(restart) { const r = await api.tv.launch(restart); if (r && r.needsRestart) { const ok = await modal({ title: "Restart TradingView?", text: "It's open without MSK. Restarting lets MSK hook in. Your layout stays saved.", ok: "Restart" }); if (ok) api.tv.launch(true); } }
+  async function launchTV(restart) { const r = await api.tv.launch(restart); if (r && r.needsRestart) { const ok = await modal({ title: "Relaunch TradingView?", text: "MSK can only connect when it starts TradingView. Relaunching keeps your saved layout.", ok: "Relaunch" }); if (ok) api.tv.launch(true); } }
 
   // HOME
   pages.home = {
@@ -239,7 +257,7 @@
             <div class="eyebrow">MSK · chart studio</div>
             <div class="wm-big">${WORDMARK}</div>
             <h1 class="title">Make the chart<br/>feel like yours.</h1>
-            <div class="row wrap"><button class="btn solid" data-go="workshop">${I.wand}Open Workshop</button><button class="btn glass bubble" data-act="import">${I.upload}Add media</button></div>
+            <div class="row wrap"><button class="btn solid" data-go="editor">${I.wand}Open Editor</button><button class="btn glass bubble" data-act="import">${I.upload}Add media</button></div>
           </section>
           <section class="status-card glass" id="h-status"></section>
         </div>
@@ -256,7 +274,7 @@
         const act = a.dataset.act;
         if (act === "import") importMedia();
         if (act === "launch") launchTV(a.dataset.restart === "1");
-        if (act === "edit") go("workshop", { configId: S.activeConfigId });
+        if (act === "edit") go("editor", { configId: S.activeConfigId });
         if (act === "next") api.config.next();
         if (act === "toggle") api.setEnabled(!S.enabled);
         if (act === "chip") api.config.activate(a.dataset.id);
@@ -286,7 +304,7 @@
           <div class="big-name">${esc(c.name)}</div>
           <div class="row wrap"><span class="badge ${S.enabled ? "on" : ""}">${S.enabled ? "Live" : "Paused"}</span><span class="badge">${c.bg.mode === "behind" ? "Behind chart" : "Overlay"}</span>${MSK_FX.active(c).any ? `<span class="badge ${S.fxPaused ? "" : "on"}">FX${S.fxPaused ? " paused" : ""}</span>` : ""}${m ? `<span class="badge">${m.type}</span>` : `<span class="badge">No media</span>`}</div>
           <div class="swatches">${[c.chart.up, c.chart.down, c.chart.wickUp, c.chart.wickDown, c.chart.crosshair].map((x) => `<span class="sw" style="background:${x}"></span>`).join("")}</div>
-          <div class="muted" style="font-size:13px">${m ? esc(m.name) : "Pick a photo or video in the Workshop."}</div>
+          <div class="muted" style="font-size:13px">${m ? esc(m.name) : "Pick a photo or video in the Editor."}</div>
           ${MSK_FX.active(c).any ? `<div class="fx-sum">${(c.fx || []).filter((a) => a.on && MSK_FX.TARGETS[a.target]).map((a) => `<span>${esc(MSK_FX.TARGETS[a.target].label)} · ${MSK_FX.WAVES[a.wave] || a.wave}</span>`).join("")}</div>` : ""}
           <div class="row wrap" style="margin-top:auto"><button class="btn solid sm" data-act="edit">${I.edit}Edit</button><button class="btn glass bubble sm" data-act="next">${I.next}Next</button><button class="btn ghost sm" data-act="toggle">${S.enabled ? "Pause" : "Resume"}</button></div>`;
       }
@@ -321,11 +339,11 @@
         const id = a.dataset.id, m = id && findMedia(id);
         if (a.dataset.act === "import") importMedia();
         if (a.dataset.act === "fav") api.media.update(id, { fav: !m.fav });
-        if (a.dataset.act === "open") go("workshop", { mediaId: id });
+        if (a.dataset.act === "open") go("editor", { mediaId: id });
         if (a.dataset.act === "more") {
           const r = a.getBoundingClientRect();
           menu(r.left, r.bottom + 6, [
-            { label: "New config from this", run: () => go("workshop", { mediaId: id }) },
+            { label: "New config from this", run: () => go("editor", { mediaId: id }) },
             { label: "Use on active config", run: async () => { const c = clone(activeCfg()); c.bg.mediaId = id; const saved = await api.config.save(c); await api.config.activate(saved.id); toast("Background updated"); } },
             { label: "Rename", run: async () => { const n = await modal({ title: "Rename", input: m.name, ok: "Save" }); if (n) api.media.update(id, { name: n }); } },
             { label: "Delete", danger: true, run: async () => { if (await modal({ title: "Delete media?", text: `"${m.name}" will be removed from your library.`, ok: "Delete", danger: true })) api.media.remove(id); } },
@@ -362,7 +380,7 @@
     },
   };
 
-  // WORKSHOP
+  // EDITOR
   const W = { draft: null, sourceId: null, dirty: false, live: false, link: true };
   function openDraft(opts = {}) {
     if (opts.configId) { const c = findCfg(opts.configId); if (c) { W.draft = clone(c); W.sourceId = c.id; W.dirty = false; } }
@@ -376,7 +394,7 @@
   let liveT;
   function pushLive() { if (!W.live) return; clearTimeout(liveT); liveT = setTimeout(() => api.config.preview(W.draft), 70); }
 
-  pages.workshop = {
+  pages.editor = {
     mount(v, opts) {
       openDraft(opts);
       const d = W.draft;
@@ -613,9 +631,9 @@
         const id = a.dataset.id, c = id && findCfg(id);
         switch (a.dataset.act) {
           case "import": { const n = await api.config.import(); if (n) toast(`Imported ${n} config${n > 1 ? "s" : ""}`); break; }
-          case "new": go("workshop", { fresh: true }); break;
+          case "new": go("editor", { fresh: true }); break;
           case "apply": api.config.activate(id); toast(`${c.name} applied`); break;
-          case "edit": go("workshop", { configId: id }); break;
+          case "edit": go("editor", { configId: id }); break;
           case "dup": api.config.duplicate(id); break;
           case "export": if (await api.config.export(id)) toast("Exported"); break;
           case "del": if (await modal({ title: "Delete config?", text: `"${c.name}" will be gone for good.`, ok: "Delete", danger: true })) api.config.remove(id); break;
@@ -669,6 +687,7 @@
       const EXT = isExt();
       const SECTIONS = [
         ["general", "General", I.home],
+        ["look", "Appearance", I.moon],
         ["tv", "TradingView", I.chart],
         ["fx", "Animations", I.wand],
         ["keys", "Hotkeys", I.keyboard],
@@ -685,13 +704,19 @@
             ${D(R(I.power, isMac() ? "Open MSK when you log in" : "Launch MSK when Windows starts", isMac() ? "Starts quietly in the menu bar" : "Starts quietly in the tray when you log in", "startup"))}
             ${D(R(I.eye, "Start hidden", isMac() ? "Only the menu bar icon shows on login" : "Only the tray icon shows on startup", "startHidden"))}
             ${D(R(I.layers, isMac() ? "Keep running when closed" : "Close to tray", isMac() ? "Closing the window keeps MSK in the menu bar" : "The X button keeps MSK running in the background", "closeToTray"))}
-            ${R(I.moon, "Theme", "Black or white app look", "theme")}
             ${R(I.out, "Check for updates automatically", "Looks for a new version on GitHub every few hours", "autoUpdate")}
             ${R(I.refresh, "Check for updates", `You're on v${esc(S.version)}`, "checkUpd")}
             ${R(I.refresh, "Auto-rotate configs", 'Cycles configs marked "Rotate" (all of them if none are)', "rotEnabled")}
             ${R(I.clock, "Rotate every", "Minutes between switches", "rotMins")}
           </section>
-          <section class="set-sec glass" id="sec-tv" style="--i:1"><h3>${I.chart}TradingView</h3>
+          <section class="set-sec glass" id="sec-look" style="--i:1"><h3>${I.moon}Appearance</h3>
+            ${R(I.moon, "Theme", "Black or white app look", "theme")}
+            ${R(I.star, "Accent color", "Buttons, toggles, highlights and the logo glow", "uiAccent")}
+            ${R(I.wand, "Glow color", "The soft light drifting behind the app", "uiGlow")}
+            ${R(I.layers, "Background color", "App background for the current theme. Leave on default to follow the theme.", "uiBg")}
+            ${R(I.refresh, "Reset colors", "Back to the original MSK look", "uiReset")}
+          </section>
+          <section class="set-sec glass" id="sec-tv" style="--i:2"><h3>${I.chart}TradingView</h3>
             <div class="tv-hero" id="tv-hero"></div>
             ${EXT ? `<div class="faint" style="font-size:12.5px;padding:6px 0 14px">MSK runs on every tradingview.com chart tab in this browser. Changes show up instantly, no restart needed.</div>` : ""}
             ${EXT ? "" : `${R(I.play, "Open TradingView with MSK", "Starts it hooked whenever MSK starts", "autoLaunchTV")}
@@ -719,7 +744,6 @@
           ${EXT ? "" : `<section class="set-sec glass" id="sec-debug" style="--i:4"><h3>${I.bug}Debug</h3>
             ${R(I.eye, "Show logs", "Shows the Logs page in the sidebar", "showLogs")}
             ${R(I.list, "Verbose logging", "Logs every detail. Turn on when something's off.", "verbose")}
-            ${isMac() ? "" : R(I.search, "Watch processes", "Logs TradingView processes, ports and connections", "watch")}
             ${R(I.list, "Open logs", "Live log viewer with filters", "openLogs")}
             ${R(I.folder, "Log file", "msk.log in your MSK data folder", "logFile")}
             ${R(I.search, "Run diagnostics", "Checks the whole hook chain and writes it to the log", "diag")}
@@ -743,6 +767,36 @@
       const setSw = (key) => sw(!!S.settings[key], (on) => api.settings({ [key]: on }));
       put("startup", setSw("startup")); put("startHidden", setSw("startHidden")); put("closeToTray", setSw("closeToTray"));
       put("theme", seg([["dark", "Black"], ["light", "White"]], s.theme, (t) => api.settings({ theme: t })));
+      // appearance: preview live while picking, save when done
+      const look = { ...appearance() };
+      const saveLook = () => api.settings({ appearance: { ...look } });
+      const picker = (key, fallback) => {
+        const w = el(`<span class="acc-row"><span class="color-hex mono"></span><label class="color-pick"><input type="color" /></label></span>`);
+        const inp = $("input", w), hex = $(".color-hex", w);
+        const show = () => { const v = look[key] || fallback(); inp.value = v.toLowerCase(); hex.textContent = look[key] ? v.toUpperCase() : "Default"; };
+        inp.oninput = () => { look[key] = inp.value.toUpperCase(); hex.textContent = look[key]; applyAppearance(look); markSw(); };
+        inp.onchange = () => saveLook();
+        w._show = show; show(); return w;
+      };
+      const bgKey = () => (document.documentElement.dataset.theme === "light" ? "bgLight" : "bgDark");
+      const accW = el(`<span class="acc-row">${UI_PRESETS.map(([n, c]) => `<button class="acc-sw" title="${n}" data-c="${c}" style="background:${c}"></button>`).join("")}</span>`);
+      const accPick = picker("accent", () => UI_DEFAULT.accent); accW.appendChild(accPick);
+      const markSw = () => $$(".acc-sw", accW).forEach((b) => b.classList.toggle("on", b.dataset.c.toLowerCase() === String(look.accent).toLowerCase()));
+      accW.addEventListener("click", (e) => { const b = e.target.closest(".acc-sw"); if (!b) return; const prev = String(look.accent).toLowerCase(); look.accent = b.dataset.c; if (!look.glow || String(look.glow).toLowerCase() === prev) look.glow = b.dataset.c; applyAppearance(look); accPick._show(); glowPick._show(); markSw(); saveLook(); });
+      const glowPick = picker("glow", () => look.accent);
+      const bgWrap = el(`<span class="acc-row"></span>`);
+      const renderBg = () => {
+        bgWrap.innerHTML = "";
+        const k = bgKey(), p = picker(k, () => (k === "bgLight" ? "#F3F4F5" : "#000000"));
+        bgWrap.appendChild(p);
+        if (look[k]) bgWrap.appendChild(btn("Default", "ghost", () => { look[k] = ""; applyAppearance(look); saveLook(); renderBg(); }));
+        $("input", p).addEventListener("change", () => renderBg());
+      };
+      const syncLook = () => { renderBg(); applyAppearance(look); };
+      renderBg(); markSw();
+      this.syncLook = syncLook; this.lastTheme = S.settings.theme;
+      put("uiAccent", accW); put("uiGlow", glowPick); put("uiBg", bgWrap);
+      put("uiReset", btn(`${I.refresh}Reset`, "ghost", () => { Object.assign(look, UI_DEFAULT); applyAppearance(look); accPick._show(); glowPick._show(); renderBg(); markSw(); saveLook(); toast("Colors reset"); }));
       put("autoUpdate", sw(s.autoUpdate !== false, (on) => api.settings({ autoUpdate: on })));
       put("checkUpd", btn(`${I.refresh}Check now`, "glass bubble", async () => {
         toast("Checking GitHub...");
@@ -766,7 +820,6 @@
       put("hk-pal", el(`<span class="keys">${keycaps(isMac() ? "CommandOrControl+K" : "Ctrl+K")}</span>`));
       put("showLogs", sw(s.showLogs !== false, (on) => api.settings({ showLogs: on })));
       put("verbose", sw(info.verbose, (on) => api.logs.verbose(on)));
-      put("watch", sw(info.watching, async (on) => { const r = await api.watch(on); if (on && !r) toast("Watcher only works on Windows", "warn"); }));
       put("openLogs", btn("Open", "glass bubble", () => go("logs")));
       put("logFile", btn(`${I.folder}Show`, "ghost", () => api.logs.open()));
       put("diag", btn(`${I.search}Run`, "glass bubble", async () => { toast("Running diagnostics..."); await api.tv.diagnose(); toast("Diagnostics written to the log"); }));
@@ -821,6 +874,7 @@
       this.update();
     },
     update() {
+      if (this.syncLook && this.lastTheme !== S.settings.theme) { this.lastTheme = S.settings.theme; this.syncLook(); }
       const h = $("#tv-hero"); if (!h) return;
       const t = tvInfo(), st = S.tv || {};
       h.innerHTML = `<div class="status-orb"><span class="dot ${t.dot}"></span></div>
@@ -888,7 +942,6 @@
         <div class="toolbar"><span id="g-seg"></span>
           <label class="search glass">${I.search}<input placeholder="Filter logs" value="${esc(LG.q)}" /></label>
           <span class="grow"></span>
-          <label class="row" style="gap:8px;font-size:12.5px;color:var(--fg-2)">Watch processes<span id="g-watch"></span></label>
           <label class="row" style="gap:8px;font-size:12.5px;color:var(--fg-2)">Verbose<span id="g-verb"></span></label>
           <button class="btn ghost sm" data-act="copy">${I.copy}Copy</button>
           <button class="btn ghost sm" data-act="file">${I.folder}Log file</button>
@@ -913,7 +966,6 @@
       const info = await api.logs.get();
       logInfo = info; LOGS = info.lines;
       $("#g-verb", v).replaceWith(sw(info.verbose, (on) => api.logs.verbose(on)));
-      $("#g-watch", v).replaceWith(sw(info.watching, async (on) => { const r = await api.watch(on); if (on && !r) toast("Watcher only works on Windows", "warn"); }));
       $("#g-file", v).textContent = `Log file: ${info.file}${info.debug ? "  ·  debug mode" : ""}`;
       this.render();
     },
@@ -938,14 +990,14 @@
     if ($(".pal-scrim")) return;
     const items = () => [
       ...S.configs.map((c) => ({ g: "Apply config", label: c.name, hint: c.id === S.activeConfigId ? "Active" : c.bg.mode === "behind" ? "Behind" : "Overlay", icon: I.layers, run: () => { api.config.activate(c.id); toast(`${c.name} applied`); } })),
-      ...S.configs.map((c) => ({ g: "Edit config", label: "Edit " + c.name, icon: I.edit, run: () => go("workshop", { configId: c.id }) })),
-      ...[["home", "Home", I.home], ["library", "Library", I.image], ["workshop", "Workshop", I.wand], ["configs", "Configs", I.layers], ["logs", "Logs", I.list], ["settings", "Settings", I.keyboard]]
+      ...S.configs.map((c) => ({ g: "Edit config", label: "Edit " + c.name, icon: I.edit, run: () => go("editor", { configId: c.id }) })),
+      ...[["home", "Home", I.home], ["library", "Library", I.image], ["editor", "Editor", I.wand], ["configs", "Configs", I.layers], ["logs", "Logs", I.list], ["settings", "Settings", I.keyboard]]
         .filter(([p]) => !(isExt() && p === "logs")).map(([p, l, ic]) => ({ g: "Go to", label: l, icon: ic, run: () => go(p) })),
       { g: "Actions", label: S.enabled ? "Turn background off" : "Turn background on", icon: I.power, run: () => api.setEnabled(!S.enabled) },
       { g: "Actions", label: S.fxPaused ? "Resume animations" : "Pause animations", icon: I.wand, run: () => api.fxPause(!S.fxPaused) },
       { g: "Actions", label: "Next config", icon: I.next, run: () => api.config.next() },
       { g: "Actions", label: "Add media", icon: I.upload, run: () => importMedia() },
-      { g: "Actions", label: "New config", icon: I.plus, run: () => go("workshop", { fresh: true }) },
+      { g: "Actions", label: "New config", icon: I.plus, run: () => go("editor", { fresh: true }) },
       { g: "Actions", label: "Launch / restart TradingView", icon: I.play, run: () => launchTV((S.tv || {}).status === "no-hook") },
       ...(isExt() ? [] : [{ g: "Actions", label: "Kill all TradingView processes", icon: I.trash, run: () => killAll() }]),
       { g: "Actions", label: "Restart MSK", icon: I.refresh, run: () => api.app.restart() },
@@ -995,6 +1047,7 @@
   }
   let navT;
   function go(name, opts) {
+    if (!pages[name]) name = "home";
     if (name === page && !opts) return;
     const v = $("#view");
     const old = $(".page", v);
@@ -1008,6 +1061,7 @@
   // ---------- global chrome ----------
   function renderChrome() {
     document.documentElement.dataset.theme = S.settings.theme;
+    applyAppearance();
     const up = $("#upd-pill");
     if (up) { up.hidden = !S.update; if (S.update) $("#upd-text").textContent = `Update v${S.update.version}`; }
     const lb = $('#nav button[data-page="logs"]'), showLogs = S.settings.showLogs !== false;
@@ -1035,7 +1089,7 @@
     $$("#nav button").forEach((b) => (b.onclick = () => go(b.dataset.page)));
     $("#master").onchange = (e) => api.setEnabled(e.target.checked);
     $("#np-next").onclick = (e) => { e.stopPropagation(); api.config.next(); };
-    $("#np").onclick = () => go("workshop", { configId: S.activeConfigId });
+    $("#np").onclick = () => go("editor", { configId: S.activeConfigId });
     $("#pal-btn").onclick = () => palette();
     $("#upd-pill").onclick = () => go("home");
     window.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); palette(); } });
