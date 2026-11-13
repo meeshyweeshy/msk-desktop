@@ -93,7 +93,7 @@ npm run dist       # Windows installer + zip in dist/
 npm run ext        # build the browser extension into dist/extension
 ```
 
-Tagging a version (`git tag v1.2.0 && git push --tags`) builds the Windows release automatically with GitHub Actions.
+**Releases are automatic:** bump `"version"` in `package.json` and push to `main`. GitHub Actions builds the installer, portable zip and extension zip and publishes them as a new Release, and everyone's app sees the update.
 
 ## ✦ Troubleshooting
 
